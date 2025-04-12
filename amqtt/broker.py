@@ -316,7 +316,7 @@ class Broker:
                 address,
                 port,
                 ssl=ssl_context,
-                reuse_port=True,
+                reuse_port=False,
                 subprotocols=[websockets.Subprotocol("mqtt")],
             )
         msg = f"Unsupported listener type: {listener_type}"
