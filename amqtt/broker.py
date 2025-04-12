@@ -316,6 +316,7 @@ class Broker:
                 address,
                 port,
                 ssl=ssl_context,
+                reuse_port=True,
                 subprotocols=[websockets.Subprotocol("mqtt")],
             )
         msg = f"Unsupported listener type: {listener_type}"
@@ -420,6 +421,7 @@ class Broker:
                 f"[MQTT-3.1.0-1] {format_client_message(address=remote_address, port=remote_port)}:"
                 f" Can't read first packet as CONNECT: {exc}",
             )
+            await writer.close()
             raise AMQTTError(exc) from exc
         except MQTTError as exc:
             self.logger.exception(
@@ -431,6 +433,7 @@ class Broker:
             self.logger.error(  # noqa: TRY400 # cannot replace with exception else pytest fails
                 f"No data from {format_client_message(address=remote_address, port=remote_port)} : {exc}",
             )
+            await writer.close()
             raise NoDataError(exc) from exc
 
         if client_session.clean_session:
@@ -871,7 +874,6 @@ class Broker:
 
             # Skip all subscriptions which do not match the topic
             if not self._matches(broadcast["topic"], k_filter):
-                self.logger.debug(f"Topic '{broadcast['topic']}' does not match filter '{k_filter}'")
                 continue
 
             for target_session, sub_qos in subscriptions:
