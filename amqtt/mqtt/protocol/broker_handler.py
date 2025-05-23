@@ -12,6 +12,7 @@ from amqtt.mqtt.connack import (
     ConnackPacket,
 )
 from amqtt.mqtt.connect import ConnectPacket
+from amqtt.mqtt.constants import MQTT_3_1, MQTT_3_1_1, MQTT_5_0, UNSUPPORTED_PROTOCOL_VERSION
 from amqtt.mqtt.disconnect import DisconnectPacket
 from amqtt.mqtt.pingreq import PingReqPacket
 from amqtt.mqtt.pingresp import PingRespPacket
@@ -26,7 +27,8 @@ from amqtt.utils import format_client_message
 
 from .handler import EVENT_MQTT_PACKET_RECEIVED, EVENT_MQTT_PACKET_SENT
 
-_MQTT_PROTOCOL_LEVEL_SUPPORTED = 4
+# MQTT protocol versions supported by this implementation
+_MQTT_PROTOCOL_VERSIONS_SUPPORTED = [MQTT_3_1_1, MQTT_5_0]  # Support both 3.1.1 and 5.0
 
 
 class Subscription:
@@ -56,7 +58,7 @@ class BrokerProtocolHandler(ProtocolHandler):
     async def start(self) -> None:
         await super().start()
         # Ensure the disconnect waiter is reset
-        if self._disconnect_waiter is None or self._disconnect_waiter.done():
+        if self._disconnect_waiter and self._disconnect_waiter.done():
             self._disconnect_waiter = asyncio.Future()
 
     async def stop(self) -> None:
@@ -166,73 +168,57 @@ class BrokerProtocolHandler(ProtocolHandler):
         if connect.variable_header is None:
             msg = "CONNECT packet: variable header not initialized."
             raise MQTTError(msg)
+
+        # Check protocol version
+        remote_address, remote_port = writer.get_peer_info()
+        proto_level = connect.variable_header.proto_level
+
+        if proto_level not in _MQTT_PROTOCOL_VERSIONS_SUPPORTED:
+            if proto_level == MQTT_3_1:  # Handle MQTT 3.1 (not 3.1.1) specially
+                connack = ConnackPacket.build(0, UNACCEPTABLE_PROTOCOL_VERSION)  # [MQTT-3.2.2-4] session_parent=0
+            elif proto_level == MQTT_5_0:  # For MQTT 5.0, use the MQTT5 reason code
+                connack = ConnackPacket.build_mqtt5(0, UNSUPPORTED_PROTOCOL_VERSION)
+            else:  # For other unsupported versions
+                connack = ConnackPacket.build(0, UNACCEPTABLE_PROTOCOL_VERSION)  # [MQTT-3.2.2-4] session_parent=0
+                
+            await plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack)
+            await connack.to_stream(writer)
+            await writer.close()
+            msg = f"Invalid protocol from {remote_address}:{remote_port}: 0x{proto_level:02x}"
+            raise MQTTError(msg)
+
         if connect.payload is None:
             msg = "CONNECT packet: payload not initialized."
             raise MQTTError(msg)
 
-        # this shouldn't be required anymore since broker generates for each client a random client_id if not provided
-        # [MQTT-3.1.3-6]
-        if connect.payload.client_id is None:
-            msg = "[[MQTT-3.1.3-3]] : Client identifier must be present"
-            raise MQTTError(msg)
-
-        if connect.variable_header.will_flag and (connect.payload.will_topic is None or connect.payload.will_message is None):
-            msg = "Will flag set, but will topic/message not present in payload"
-            raise MQTTError(msg)
-
-        if connect.variable_header.reserved_flag:
-            msg = "[MQTT-3.1.2-3] CONNECT reserved flag must be set to 0"
-            raise MQTTError(msg)
-
-        if connect.proto_name != "MQTT":
-            msg = f'[MQTT-3.1.2-1] Incorrect protocol name: "{connect.proto_name}"'
-            raise MQTTError(msg)
-
-        remote_info = writer.get_peer_info()
-        if remote_info is not None:
-            remote_address, remote_port = remote_info
-            connack = None
-            error_msg = None
-            if connect.proto_level != _MQTT_PROTOCOL_LEVEL_SUPPORTED:
-                # only MQTT 3.1.1 supported
-                error_msg = (
-                    f"Invalid protocol from {format_client_message(address=remote_address, port=remote_port)}:"
-                    f" {connect.proto_level}"
-                )
-                connack = ConnackPacket.build(0, UNACCEPTABLE_PROTOCOL_VERSION)  # [MQTT-3.2.2-4] session_parent=0
-            elif not connect.username_flag and connect.password_flag:
-                connack = ConnackPacket.build(0, BAD_USERNAME_PASSWORD)  # [MQTT-3.1.2-22]
-            elif connect.username_flag and connect.username is None:
-                error_msg = f"Invalid username from {format_client_message(address=remote_address, port=remote_port)}"
-                connack = ConnackPacket.build(0, BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
-            elif connect.password_flag and connect.password is None:
-                error_msg = f"Invalid password from {format_client_message(address=remote_address, port=remote_port)}"
-                connack = ConnackPacket.build(0, BAD_USERNAME_PASSWORD)  # [MQTT-3.2.2-4] session_parent=0
-            elif connect.clean_session_flag is False and connect.payload.client_id_is_random:
-                error_msg = (
-                    f"[MQTT-3.1.3-8] [MQTT-3.1.3-9] {format_client_message(address=remote_address, port=remote_port)}:"
-                    " No client Id provided (cleansession=0)"
-                )
+        if connect.client_id == "":
+            if not connect.clean_session_flag:
                 connack = ConnackPacket.build(0, IDENTIFIER_REJECTED)
-
-            if connack is not None:
                 await plugins_manager.fire_event(EVENT_MQTT_PACKET_SENT, packet=connack)
                 await connack.to_stream(writer)
                 await writer.close()
-                raise MQTTError(error_msg) from None
+                msg = f"[MQTT-3.1.3-8] Invalid client_id with CleanSession=0: {connect.client_id}"
+                raise MQTTError(msg)
 
         incoming_session = Session()
         incoming_session.client_id = connect.client_id
         incoming_session.clean_session = connect.clean_session_flag
         incoming_session.will_flag = connect.will_flag
-        incoming_session.will_retain = connect.will_retain_flag
-        incoming_session.will_qos = connect.will_qos
-        incoming_session.will_topic = connect.will_topic
         incoming_session.will_message = connect.will_message
+        incoming_session.will_qos = connect.will_qos
+        incoming_session.will_retain = connect.will_retain_flag
+        incoming_session.will_topic = connect.will_topic
         incoming_session.username = connect.username
         incoming_session.password = connect.password
         incoming_session.remote_address = remote_address
         incoming_session.remote_port = remote_port
+        
+        # For MQTT5, store the protocol version and properties
+        incoming_session.protocol_version = proto_level
+        if proto_level == MQTT_5_0 and hasattr(connect, 'properties'):
+            incoming_session.properties = connect.properties
+            if hasattr(connect, 'will_properties'):
+                incoming_session.will_properties = connect.will_properties
 
         incoming_session.keep_alive = max(connect.keep_alive, 0)
 

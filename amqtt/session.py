@@ -1,10 +1,11 @@
 from asyncio import Queue
 from collections import OrderedDict
-from typing import Any, ClassVar
-
+from typing import Any, ClassVar, Dict, Optional, Set
 from transitions import Machine
 
 from amqtt.errors import AMQTTError
+from amqtt.mqtt.constants import MQTT_3_1_1, MQTT_5_0
+from amqtt.mqtt.properties import Properties
 from amqtt.mqtt.publish import PublishPacket
 
 OUTGOING = 0
@@ -151,6 +152,11 @@ class Session:
         # Stores PUBLISH messages ID received in order and ready for application process
         self.delivered_message_queue: Queue[ApplicationMessage] = Queue()
 
+        # MQTT5 specific attributes
+        self.protocol_version: int = MQTT_3_1_1  # Default to MQTT 3.1.1
+        self.properties: Properties = Properties()  # Connect properties
+        self.will_properties: Properties = Properties()  # Will properties
+
     def _init_states(self) -> None:
         self.transitions = Machine(states=Session.states, initial="new")
         self.transitions.add_transition(
@@ -202,6 +208,26 @@ class Session:
     @property
     def retained_messages_count(self) -> int:
         return self.retained_messages.qsize()
+
+    @property
+    def is_mqtt5(self) -> bool:
+        """Return True if this session is using MQTT5."""
+        return self.protocol_version == MQTT_5_0
+
+    def add_subscription(self, topic: str, qos: int, subscription_options: Optional[Dict] = None) -> None:
+        """Add a subscription for this session."""
+        if topic not in self.subscriptions:
+            self.subscriptions[topic] = {}
+        self.subscriptions[topic]["qos"] = qos
+        
+        # Store MQTT5 subscription options if provided
+        if subscription_options and self.is_mqtt5:
+            self.subscriptions[topic]["options"] = subscription_options
+
+    def remove_subscription(self, topic: str) -> None:
+        """Remove a subscription for this session."""
+        if topic in self.subscriptions:
+            del self.subscriptions[topic]
 
     def __repr__(self) -> str:
         """Return a string representation of the session.

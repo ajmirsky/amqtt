@@ -1,34 +1,36 @@
+"""MQTT5 AUTH packet implementation."""
+
 from typing import Self
 
 from amqtt.adapters import ReaderAdapter
 from amqtt.codecs_amqtt import bytes_to_int, read_or_raise
 from amqtt.errors import AMQTTError
-from amqtt.mqtt.constants import DISCONNECT, NORMAL_DISCONNECTION
+from amqtt.mqtt.constants import AUTH, SUCCESS
 from amqtt.mqtt.packet import MQTTFixedHeader, MQTTPacket, MQTTPayload, MQTTVariableHeader
 from amqtt.mqtt.properties import Properties
 
 
-class DisconnectVariableHeader(MQTTVariableHeader):
-    """Variable header for DISCONNECT packet."""
+class AuthVariableHeader(MQTTVariableHeader):
+    """Variable header for AUTH packet."""
 
     __slots__ = ("reason_code", "properties")
 
-    def __init__(self, reason_code: int = NORMAL_DISCONNECTION) -> None:
+    def __init__(self, reason_code: int = SUCCESS) -> None:
         super().__init__()
         self.reason_code = reason_code
         self.properties = Properties()
 
     def __repr__(self) -> str:
-        return f"DisconnectVariableHeader(reason_code={self.reason_code}, properties={self.properties})"
+        return f"AuthVariableHeader(reason_code={self.reason_code}, properties={self.properties})"
 
     @classmethod
     async def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader) -> Self:
         """Decode variable header from stream."""
-        # For MQTT 3.1.1, there is no variable header
+        # For empty AUTH packet (no reason code or properties)
         if fixed_header.remaining_length == 0:
             return cls()
             
-        # For MQTT5, read reason code
+        # Read reason code
         reason_code_bytes = await read_or_raise(reader, 1)
         reason_code = bytes_to_int(reason_code_bytes)
         var_header = cls(reason_code)
@@ -41,11 +43,10 @@ class DisconnectVariableHeader(MQTTVariableHeader):
 
     def to_bytes(self) -> bytearray:
         """Encode variable header to bytes."""
-        # For MQTT 3.1.1, return empty bytearray
-        if not hasattr(self, 'mqtt5') or not self.mqtt5:
+        # If reason code is SUCCESS (0) and no properties, return empty bytearray
+        if self.reason_code == SUCCESS and not self.properties.properties:
             return bytearray()
             
-        # For MQTT5, include reason code and properties
         out = bytearray(1)  # reason code
         out[0] = self.reason_code
         
@@ -54,20 +55,20 @@ class DisconnectVariableHeader(MQTTVariableHeader):
         return out
 
 
-class DisconnectPacket(MQTTPacket[DisconnectVariableHeader, None, MQTTFixedHeader]):
-    """DISCONNECT packet."""
+class AuthPacket(MQTTPacket[AuthVariableHeader, None, MQTTFixedHeader]):
+    """AUTH packet for MQTT5."""
 
-    VARIABLE_HEADER = DisconnectVariableHeader
+    VARIABLE_HEADER = AuthVariableHeader
     PAYLOAD = None
 
     def __init__(
         self,
         fixed: MQTTFixedHeader = None,
-        variable_header: DisconnectVariableHeader = None,
+        variable_header: AuthVariableHeader = None,
         payload=None,
     ) -> None:
         if fixed is None:
-            fixed = MQTTFixedHeader(DISCONNECT, 0x00)
+            fixed = MQTTFixedHeader(AUTH, 0x00)
 
         super().__init__(fixed, variable_header, payload)
 
@@ -76,42 +77,35 @@ class DisconnectPacket(MQTTPacket[DisconnectVariableHeader, None, MQTTFixedHeade
         """Return the reason code."""
         if self.variable_header is not None:
             return self.variable_header.reason_code
-        return NORMAL_DISCONNECTION
+        return SUCCESS
 
     @reason_code.setter
     def reason_code(self, reason_code: int) -> None:
         """Set the reason code."""
         if self.variable_header is None:
-            self.variable_header = DisconnectVariableHeader()
+            self.variable_header = AuthVariableHeader()
         self.variable_header.reason_code = reason_code
 
     @property
     def properties(self) -> Properties:
-        """Return the properties for MQTT5."""
+        """Return the properties."""
         if self.variable_header is not None:
             return self.variable_header.properties
         return Properties()
 
     @properties.setter
     def properties(self, properties: Properties) -> None:
-        """Set the properties for MQTT5."""
+        """Set the properties."""
         if self.variable_header is None:
-            self.variable_header = DisconnectVariableHeader()
+            self.variable_header = AuthVariableHeader()
         self.variable_header.properties = properties
 
     @classmethod
-    def build(cls) -> Self:
-        """Build a DISCONNECT packet for MQTT 3.1.1."""
-        return cls()
-
-    @classmethod
-    def build_mqtt5(cls, reason_code: int = NORMAL_DISCONNECTION, properties: Properties = None) -> Self:
-        """Build a DISCONNECT packet for MQTT5."""
-        variable_header = DisconnectVariableHeader(reason_code)
-        variable_header.mqtt5 = True  # Mark as MQTT5 packet
+    def build(cls, reason_code: int = SUCCESS, properties: Properties = None) -> Self:
+        """Build an AUTH packet."""
+        variable_header = AuthVariableHeader(reason_code)
         
         if properties:
             variable_header.properties = properties
             
-        packet = cls(fixed=MQTTFixedHeader(DISCONNECT, 0x01), variable_header=variable_header)
-        return packet
+        return cls(variable_header=variable_header)
