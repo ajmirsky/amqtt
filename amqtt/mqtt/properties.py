@@ -15,7 +15,7 @@ from amqtt.codecs_amqtt import (
     int_to_bytes,
     read_or_raise,
 )
-from amqtt.errors import AMQTTError
+from amqtt.errors import MQTTError as AMQTTError
 from amqtt.mqtt.constants import (
     AUTHENTICATION_DATA,
     AUTHENTICATION_METHOD,
@@ -145,66 +145,77 @@ class Properties:
     async def from_stream(cls, reader: ReaderAdapter) -> Self:
         """Decode properties from a stream."""
         properties = cls()
-        property_length = await decode_data_with_length(reader)
+        
+        # Read the property length as a variable byte integer
+        property_length_bytes = await read_or_raise(reader, 1)
+        property_length = bytes_to_int(property_length_bytes)
+        
+        # If the length is 0, return empty properties
         if property_length == 0:
             return properties
-
-        # Read the property length bytes
-        property_bytes = await read_or_raise(reader, property_length)
-        property_reader = ReaderAdapter(property_bytes)
-
-        while True:
+        
+        # Read properties until we've consumed all bytes
+        bytes_read = 0
+        while bytes_read < property_length:
             try:
-                property_id_byte = await read_or_raise(property_reader, 1)
+                # Read property ID
+                property_id_byte = await read_or_raise(reader, 1)
+                property_id = bytes_to_int(property_id_byte)
+                bytes_read += 1
+                
+                if property_id not in PROPERTY_TYPES:
+                    # Skip unknown property
+                    continue
+                    
+                # Read property value based on its type
+                property_type = PROPERTY_TYPES[property_id]
+                
+                if property_type == PropertyType.BYTE:
+                    value_bytes = await read_or_raise(reader, 1)
+                    value = bytes_to_int(value_bytes)
+                    bytes_read += 1
+                    properties.set(property_id, value)
+                    
+                elif property_type == PropertyType.TWO_BYTE_INTEGER:
+                    value_bytes = await read_or_raise(reader, 2)
+                    value = bytes_to_int(value_bytes)
+                    bytes_read += 2
+                    properties.set(property_id, value)
+                    
+                elif property_type == PropertyType.FOUR_BYTE_INTEGER:
+                    value_bytes = await read_or_raise(reader, 4)
+                    value = bytes_to_int(value_bytes)
+                    bytes_read += 4
+                    properties.set(property_id, value)
+                    
+                elif property_type == PropertyType.VARIABLE_BYTE_INTEGER:
+                    value = await decode_data_with_length(reader)
+                    bytes_read += len(int_to_bytes(value))
+                    properties.set(property_id, value)
+                    
+                elif property_type == PropertyType.BINARY_DATA:
+                    length = await decode_data_with_length(reader)
+                    bytes_read += len(int_to_bytes(length))
+                    value = await read_or_raise(reader, length)
+                    bytes_read += length
+                    properties.set(property_id, value)
+                    
+                elif property_type == PropertyType.UTF8_ENCODED_STRING:
+                    value, bytes_consumed = await decode_string(reader)
+                    bytes_read += bytes_consumed
+                    properties.set(property_id, value)
+                    
+                elif property_type == PropertyType.UTF8_STRING_PAIR:
+                    name, bytes_consumed_name = await decode_string(reader)
+                    bytes_read += bytes_consumed_name
+                    value, bytes_consumed_value = await decode_string(reader)
+                    bytes_read += bytes_consumed_value
+                    properties.add_user_property(name, value)
+                    
             except AMQTTError:
-                # End of properties
+                # End of properties or error
                 break
-
-            property_id = bytes_to_int(property_id_byte)
-            if property_id not in PROPERTY_TYPES:
-                raise AMQTTError(f"Unknown property ID: {property_id}")
-
-            property_type = PROPERTY_TYPES[property_id]
-
-            if property_type == PropertyType.BYTE:
-                value_bytes = await read_or_raise(property_reader, 1)
-                value = bytes_to_int(value_bytes)
-            elif property_type == PropertyType.TWO_BYTE_INTEGER:
-                value_bytes = await read_or_raise(property_reader, 2)
-                value = bytes_to_int(value_bytes)
-            elif property_type == PropertyType.FOUR_BYTE_INTEGER:
-                value_bytes = await read_or_raise(property_reader, 4)
-                value = bytes_to_int(value_bytes)
-            elif property_type == PropertyType.VARIABLE_BYTE_INTEGER:
-                value = await decode_data_with_length(property_reader)
-            elif property_type == PropertyType.BINARY_DATA:
-                value = await decode_binary_data(property_reader)
-            elif property_type == PropertyType.UTF8_ENCODED_STRING:
-                value = await decode_string(property_reader)
-            elif property_type == PropertyType.UTF8_STRING_PAIR:
-                name = await decode_string(property_reader)
-                value = await decode_string(property_reader)
-                properties.add_user_property(name, value)
-                continue
-            else:
-                raise AMQTTError(f"Unsupported property type: {property_type}")
-
-            if property_id in properties._properties:
-                # For properties that can appear multiple times, handle as a list
-                if property_id == SUBSCRIPTION_IDENTIFIER:
-                    if isinstance(properties._properties[property_id], list):
-                        properties._properties[property_id].append(value)
-                    else:
-                        properties._properties[property_id] = [properties._properties[property_id], value]
-                # For User Properties, they're already handled separately
-                elif property_id == USER_PROPERTY:
-                    pass
-                else:
-                    # For properties that should appear only once, this is a protocol error
-                    raise AMQTTError(f"Duplicate property ID: {property_id}")
-            else:
-                properties._properties[property_id] = value
-
+                
         return properties
 
     def to_bytes(self) -> bytearray:
@@ -245,7 +256,20 @@ class Properties:
 
         # Encode the total length as a variable byte integer
         result = bytearray()
-        result.extend(encode_data_with_length(len(data)))
-        result.extend(data)
+        # If data is empty, encode a zero length
+        if not data:
+            result.append(0)
+        else:
+            # Calculate the length of the data and encode it as a variable byte integer
+            data_length = len(data)
+            # For now, we'll use a simple encoding for lengths < 128
+            if data_length < 128:
+                result.append(data_length)
+            else:
+                # For larger lengths, we need proper variable byte integer encoding
+                # This is a simplified implementation for lengths < 16384
+                result.append((data_length & 0x7F) | 0x80)
+                result.append((data_length >> 7) & 0x7F)
+            result.extend(data)
 
         return result

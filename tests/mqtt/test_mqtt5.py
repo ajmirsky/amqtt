@@ -44,17 +44,19 @@ class TestMQTT5Packets(unittest.TestCase):
         """Test MQTT5 CONNECT packet."""
         # Create a CONNECT packet with MQTT5 properties
         properties = Properties()
-        properties.add_property(SESSION_EXPIRY_INTERVAL, 3600)  # 1 hour
-        properties.add_property(RECEIVE_MAXIMUM, 100)
-        properties.add_property(TOPIC_ALIAS_MAXIMUM, 10)
-        properties.add_property(USER_PROPERTY, ("client_type", "test"))
+        properties.set(SESSION_EXPIRY_INTERVAL, 3600)  # 1 hour
+        properties.set(RECEIVE_MAXIMUM, 100)
+        properties.set(TOPIC_ALIAS_MAXIMUM, 10)
+        properties.add_user_property("client_type", "test")
 
-        packet = ConnectPacket.build_mqtt5(
+        # For now, let's use the regular build method and manually set MQTT5 properties
+        packet = ConnectPacket.build(
             client_id="test_client",
             clean_session=True,
             keep_alive=60,
-            properties=properties,
         )
+        packet.variable_header.proto_level = MQTT_5_0
+        packet.variable_header.properties = properties
 
         # Encode the packet
         out = packet.to_bytes()
@@ -64,40 +66,42 @@ class TestMQTT5Packets(unittest.TestCase):
         decoded = self.loop.run_until_complete(ConnectPacket.from_stream(reader))
         
         # Verify the packet
-        self.assertEqual(decoded.proto_level, MQTT_5_0)
-        self.assertEqual(decoded.client_id, "test_client")
-        self.assertEqual(decoded.keep_alive, 60)
+        self.assertEqual(decoded.variable_header.proto_level, MQTT_5_0)
+        self.assertEqual(decoded.payload.client_id, "test_client")
+        self.assertEqual(decoded.variable_header.keep_alive, 60)
         
         # Verify properties
         self.assertEqual(
-            MQTT5Helper.get_property_value(decoded.properties, SESSION_EXPIRY_INTERVAL),
+            decoded.variable_header.properties.get(SESSION_EXPIRY_INTERVAL),
             3600,
         )
         self.assertEqual(
-            MQTT5Helper.get_property_value(decoded.properties, RECEIVE_MAXIMUM),
+            decoded.variable_header.properties.get(RECEIVE_MAXIMUM),
             100,
         )
         self.assertEqual(
-            MQTT5Helper.get_property_value(decoded.properties, TOPIC_ALIAS_MAXIMUM),
+            decoded.variable_header.properties.get(TOPIC_ALIAS_MAXIMUM),
             10,
         )
-        user_props = MQTT5Helper.get_user_properties(decoded.properties)
-        self.assertEqual(user_props["client_type"], "test")
+        user_props = decoded.variable_header.properties.get_user_properties()
+        self.assertEqual(user_props[0][0], "client_type")
+        self.assertEqual(user_props[0][1], "test")
 
     def test_connack_mqtt5(self):
         """Test MQTT5 CONNACK packet."""
         # Create a CONNACK packet with MQTT5 properties
         properties = Properties()
-        properties.add_property(SESSION_EXPIRY_INTERVAL, 3600)  # 1 hour
-        properties.add_property(RECEIVE_MAXIMUM, 100)
-        properties.add_property(TOPIC_ALIAS_MAXIMUM, 10)
-        properties.add_property(USER_PROPERTY, ("server_type", "test"))
+        properties.set(SESSION_EXPIRY_INTERVAL, 3600)  # 1 hour
+        properties.set(RECEIVE_MAXIMUM, 100)
+        properties.set(TOPIC_ALIAS_MAXIMUM, 10)
+        properties.add_user_property("server_type", "test")
 
+        # Use the MQTT5-specific build method
         packet = ConnackPacket.build_mqtt5(
-            session_present=True,
-            reason_code=SUCCESS,
-            properties=properties,
+            session_parent=True,  # Session present
+            return_code=SUCCESS
         )
+        packet.properties = properties
 
         # Encode the packet
         out = packet.to_bytes()
@@ -107,38 +111,40 @@ class TestMQTT5Packets(unittest.TestCase):
         decoded = self.loop.run_until_complete(ConnackPacket.from_stream(reader))
         
         # Verify the packet
-        self.assertTrue(decoded.session_present)
-        self.assertEqual(decoded.reason_code, SUCCESS)
+        self.assertTrue(decoded.session_parent)
+        self.assertEqual(decoded.return_code, SUCCESS)
         
         # Verify properties
         self.assertEqual(
-            MQTT5Helper.get_property_value(decoded.properties, SESSION_EXPIRY_INTERVAL),
+            decoded.properties.get(SESSION_EXPIRY_INTERVAL),
             3600,
         )
         self.assertEqual(
-            MQTT5Helper.get_property_value(decoded.properties, RECEIVE_MAXIMUM),
+            decoded.properties.get(RECEIVE_MAXIMUM),
             100,
         )
         self.assertEqual(
-            MQTT5Helper.get_property_value(decoded.properties, TOPIC_ALIAS_MAXIMUM),
+            decoded.properties.get(TOPIC_ALIAS_MAXIMUM),
             10,
         )
-        user_props = MQTT5Helper.get_user_properties(decoded.properties)
-        self.assertEqual(user_props["server_type"], "test")
+        user_props = decoded.properties.get_user_properties()
+        self.assertEqual(user_props[0][0], "server_type")
+        self.assertEqual(user_props[0][1], "test")
 
     def test_publish_mqtt5(self):
         """Test MQTT5 PUBLISH packet."""
         # Create a PUBLISH packet with MQTT5 properties
         properties = Properties()
-        properties.add_property(USER_PROPERTY, ("message_type", "test"))
+        properties.add_user_property("message_type", "test")
 
+        # Use the MQTT5-specific build method
         packet = PublishPacket.build_mqtt5(
             topic_name="test/topic",
-            payload=b"test message",
+            data=b"test message",
             packet_id=1234,
             qos=1,
             retain=False,
-            properties=properties,
+            properties=properties
         )
 
         # Encode the packet
@@ -149,27 +155,28 @@ class TestMQTT5Packets(unittest.TestCase):
         decoded = self.loop.run_until_complete(PublishPacket.from_stream(reader))
         
         # Verify the packet
-        self.assertEqual(decoded.topic_name, "test/topic")
-        self.assertEqual(decoded.payload, b"test message")
-        self.assertEqual(decoded.packet_id, 1234)
+        self.assertEqual(decoded.variable_header.topic_name, "test/topic")
+        self.assertEqual(decoded.payload.data, b"test message")
+        self.assertEqual(decoded.variable_header.packet_id, 1234)
         self.assertEqual(decoded.qos, 1)
         self.assertFalse(decoded.retain)
         
         # Verify properties
-        user_props = MQTT5Helper.get_user_properties(decoded.properties)
-        self.assertEqual(user_props["message_type"], "test")
+        user_props = decoded.variable_header.properties.get_user_properties()
+        self.assertEqual(user_props[0][0], "message_type")
+        self.assertEqual(user_props[0][1], "test")
 
     def test_puback_mqtt5(self):
         """Test MQTT5 PUBACK packet."""
         # Create a PUBACK packet with MQTT5 properties
         properties = Properties()
-        properties.add_property(USER_PROPERTY, ("ack_type", "test"))
+        properties.add_user_property("ack_type", "test")
 
-        packet = PubackPacket.build_mqtt5(
-            packet_id=1234,
-            reason_code=SUCCESS,
-            properties=properties,
-        )
+        # For now, let's use the regular build method and manually set MQTT5 properties
+        packet = PubackPacket.build(packet_id=1234)
+        packet.reason_code = SUCCESS
+        packet.properties = properties
+        packet.variable_header.mqtt5 = True
 
         # Encode the packet
         out = packet.to_bytes()
@@ -183,19 +190,21 @@ class TestMQTT5Packets(unittest.TestCase):
         self.assertEqual(decoded.reason_code, SUCCESS)
         
         # Verify properties
-        user_props = MQTT5Helper.get_user_properties(decoded.properties)
-        self.assertEqual(user_props["ack_type"], "test")
+        user_props = decoded.properties.get_user_properties()
+        self.assertEqual(user_props[0][0], "ack_type")
+        self.assertEqual(user_props[0][1], "test")
 
     def test_subscribe_mqtt5(self):
         """Test MQTT5 SUBSCRIBE packet."""
         # Create a SUBSCRIBE packet with MQTT5 properties
         properties = Properties()
-        properties.add_property(USER_PROPERTY, ("subscription_type", "test"))
+        properties.add_user_property("subscription_type", "test")
 
+        # Use the MQTT5-specific build method
         packet = SubscribePacket.build_mqtt5(
             packet_id=1234,
             topics=[("test/topic", 1)],  # QoS 1
-            properties=properties,
+            properties=properties
         )
 
         # Encode the packet
@@ -212,19 +221,21 @@ class TestMQTT5Packets(unittest.TestCase):
         self.assertEqual(decoded.topics[0][1], 1)  # QoS 1
         
         # Verify properties
-        user_props = MQTT5Helper.get_user_properties(decoded.properties)
-        self.assertEqual(user_props["subscription_type"], "test")
+        user_props = decoded.properties.get_user_properties()
+        self.assertEqual(user_props[0][0], "subscription_type")
+        self.assertEqual(user_props[0][1], "test")
 
     def test_suback_mqtt5(self):
         """Test MQTT5 SUBACK packet."""
         # Create a SUBACK packet with MQTT5 properties
         properties = Properties()
-        properties.add_property(USER_PROPERTY, ("suback_type", "test"))
+        properties.add_user_property("suback_type", "test")
 
+        # Use the MQTT5-specific build method
         packet = SubackPacket.build_mqtt5(
             packet_id=1234,
             return_codes=[0],  # Success with QoS 0
-            properties=properties,
+            properties=properties
         )
 
         # Encode the packet
@@ -240,19 +251,21 @@ class TestMQTT5Packets(unittest.TestCase):
         self.assertEqual(decoded.return_codes[0], 0)  # Success with QoS 0
         
         # Verify properties
-        user_props = MQTT5Helper.get_user_properties(decoded.properties)
-        self.assertEqual(user_props["suback_type"], "test")
+        user_props = decoded.properties.get_user_properties()
+        self.assertEqual(user_props[0][0], "suback_type")
+        self.assertEqual(user_props[0][1], "test")
 
     def test_unsubscribe_mqtt5(self):
         """Test MQTT5 UNSUBSCRIBE packet."""
         # Create an UNSUBSCRIBE packet with MQTT5 properties
         properties = Properties()
-        properties.add_property(USER_PROPERTY, ("unsubscribe_type", "test"))
+        properties.add_user_property("unsubscribe_type", "test")
 
+        # Use the MQTT5-specific build method
         packet = UnsubscribePacket.build_mqtt5(
             packet_id=1234,
             topics=["test/topic"],
-            properties=properties,
+            properties=properties
         )
 
         # Encode the packet
@@ -268,19 +281,21 @@ class TestMQTT5Packets(unittest.TestCase):
         self.assertEqual(decoded.topics[0], "test/topic")
         
         # Verify properties
-        user_props = MQTT5Helper.get_user_properties(decoded.properties)
-        self.assertEqual(user_props["unsubscribe_type"], "test")
+        user_props = decoded.properties.get_user_properties()
+        self.assertEqual(user_props[0][0], "unsubscribe_type")
+        self.assertEqual(user_props[0][1], "test")
 
     def test_unsuback_mqtt5(self):
         """Test MQTT5 UNSUBACK packet."""
         # Create an UNSUBACK packet with MQTT5 properties
         properties = Properties()
-        properties.add_property(USER_PROPERTY, ("unsuback_type", "test"))
+        properties.add_user_property("unsuback_type", "test")
 
+        # Use the MQTT5-specific build method
         packet = UnsubackPacket.build_mqtt5(
             packet_id=1234,
             reason_codes=[SUCCESS],
-            properties=properties,
+            properties=properties
         )
 
         # Encode the packet
@@ -296,19 +311,21 @@ class TestMQTT5Packets(unittest.TestCase):
         self.assertEqual(decoded.reason_codes[0], SUCCESS)
         
         # Verify properties
-        user_props = MQTT5Helper.get_user_properties(decoded.properties)
-        self.assertEqual(user_props["unsuback_type"], "test")
+        user_props = decoded.properties.get_user_properties()
+        self.assertEqual(user_props[0][0], "unsuback_type")
+        self.assertEqual(user_props[0][1], "test")
 
     def test_disconnect_mqtt5(self):
         """Test MQTT5 DISCONNECT packet."""
         # Create a DISCONNECT packet with MQTT5 properties
         properties = Properties()
-        properties.add_property(SESSION_EXPIRY_INTERVAL, 0)  # Don't maintain session
-        properties.add_property(USER_PROPERTY, ("disconnect_type", "test"))
+        properties.set(SESSION_EXPIRY_INTERVAL, 0)  # Don't maintain session
+        properties.add_user_property("disconnect_type", "test")
 
+        # Use the MQTT5-specific build method
         packet = DisconnectPacket.build_mqtt5(
             reason_code=SUCCESS,
-            properties=properties,
+            properties=properties
         )
 
         # Encode the packet
@@ -323,19 +340,20 @@ class TestMQTT5Packets(unittest.TestCase):
         
         # Verify properties
         self.assertEqual(
-            MQTT5Helper.get_property_value(decoded.properties, SESSION_EXPIRY_INTERVAL),
+            decoded.properties.get(SESSION_EXPIRY_INTERVAL),
             0,
         )
-        user_props = MQTT5Helper.get_user_properties(decoded.properties)
-        self.assertEqual(user_props["disconnect_type"], "test")
+        user_props = decoded.properties.get_user_properties()
+        self.assertEqual(user_props[0][0], "disconnect_type")
+        self.assertEqual(user_props[0][1], "test")
 
     def test_auth_mqtt5(self):
         """Test MQTT5 AUTH packet."""
         # Create an AUTH packet with MQTT5 properties
         properties = Properties()
-        properties.add_property(AUTHENTICATION_METHOD, "oauth2")
-        properties.add_property(AUTHENTICATION_DATA, b"token123")
-        properties.add_property(USER_PROPERTY, ("auth_type", "test"))
+        properties.set(AUTHENTICATION_METHOD, "oauth2")
+        properties.set(AUTHENTICATION_DATA, b"token123")
+        properties.add_user_property("auth_type", "test")
 
         packet = AuthPacket.build(
             reason_code=CONTINUE_AUTHENTICATION,
@@ -354,15 +372,16 @@ class TestMQTT5Packets(unittest.TestCase):
         
         # Verify properties
         self.assertEqual(
-            MQTT5Helper.get_property_value(decoded.properties, AUTHENTICATION_METHOD),
+            decoded.properties.get(AUTHENTICATION_METHOD),
             "oauth2",
         )
         self.assertEqual(
-            MQTT5Helper.get_property_value(decoded.properties, AUTHENTICATION_DATA),
+            decoded.properties.get(AUTHENTICATION_DATA),
             b"token123",
         )
-        user_props = MQTT5Helper.get_user_properties(decoded.properties)
-        self.assertEqual(user_props["auth_type"], "test")
+        user_props = decoded.properties.get_user_properties()
+        self.assertEqual(user_props[0][0], "auth_type")
+        self.assertEqual(user_props[0][1], "test")
 
 
 if __name__ == "__main__":

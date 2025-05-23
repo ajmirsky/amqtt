@@ -122,9 +122,14 @@ class ConnackPacket(MQTTPacket[ConnackVariableHeader, None, MQTTFixedHeader]):
         return cls(variable_header=variable_header)
         
     @classmethod
-    def build_mqtt5(cls, session_parent: int = 0, return_code: int = 0) -> Self:
+    def build_mqtt5(cls, session_parent: int = 0, return_code: int = 0, properties: Properties = None) -> Self:
         """Build an MQTT5 CONNACK packet."""
+        fixed_header = MQTTFixedHeader(CONNACK, 0x00)
+        fixed_header.mqtt5 = True  # Mark as MQTT5 packet
+        
         variable_header = ConnackVariableHeader(session_parent, return_code)
-        variable_header.mqtt5 = True  # Mark as MQTT5 packet
-        packet = cls(fixed=MQTTFixedHeader(CONNACK, 0x01), variable_header=variable_header)
-        return packet
+        
+        if properties:
+            variable_header.properties = properties
+            
+        return cls(fixed=fixed_header, variable_header=variable_header)

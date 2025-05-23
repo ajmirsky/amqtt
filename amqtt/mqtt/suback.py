@@ -24,11 +24,13 @@ class SubackVariableHeader(MQTTVariableHeader):
     @classmethod
     async def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader) -> Self:
         """Decode variable header from stream."""
-        packet_id = await cls.read_packet_id(reader)
+        # Read packet ID (2 bytes)
+        packet_id_bytes = await read_or_raise(reader, 2)
+        packet_id = bytes_to_int(packet_id_bytes)
         var_header = cls(packet_id)
         
         # Read properties for MQTT5 packets
-        if fixed_header.flags & 0x01 == 0x01:  # MQTT5 packet flag
+        if hasattr(fixed_header, 'mqtt5') and fixed_header.mqtt5:
             var_header.properties = await Properties.from_stream(reader)
             
         return var_header
@@ -44,6 +46,21 @@ class SubackVariableHeader(MQTTVariableHeader):
             out.extend(self.properties.to_bytes())
             
         return out
+
+    @property
+    def bytes_length(self) -> int:
+        """Return the length of the variable header when encoded to bytes."""
+        length = 2  # packet_id
+        
+        # Add properties length for MQTT5
+        if hasattr(self, 'mqtt5') and self.mqtt5:
+            props_bytes = self.properties.to_bytes()
+            length += len(props_bytes)
+        elif hasattr(self, '_parent') and hasattr(self._parent, 'fixed_header') and hasattr(self._parent.fixed_header, 'mqtt5') and self._parent.fixed_header.mqtt5:
+            props_bytes = self.properties.to_bytes()
+            length += len(props_bytes)
+            
+        return length
 
 
 class SubackPayload(MQTTPayload[SubackVariableHeader]):
@@ -68,8 +85,13 @@ class SubackPayload(MQTTPayload[SubackVariableHeader]):
             return_codes.append(bytes_to_int(return_code))
         return cls(return_codes)
 
-    def to_bytes(self) -> bytearray:
-        """Encode payload to bytes."""
+    def to_bytes(self, fixed_header=None, variable_header=None) -> bytearray:
+        """Encode payload to bytes.
+        
+        :param fixed_header: Optional fixed header (not used but required for compatibility)
+        :param variable_header: Optional variable header (not used but required for compatibility)
+        :return: Encoded payload bytes
+        """
         out = bytearray()
         for return_code in self.return_codes:
             out.extend(int_to_bytes(return_code, 1))
@@ -131,12 +153,14 @@ class SubackPacket(MQTTPacket[SubackVariableHeader, SubackPayload, MQTTFixedHead
     @classmethod
     def build_mqtt5(cls, packet_id: int, return_codes: list[int], properties: Properties = None) -> Self:
         """Build a SUBACK packet for MQTT5."""
+        fixed_header = MQTTFixedHeader(SUBACK, 0x00)
+        fixed_header.mqtt5 = True  # Mark as MQTT5 packet
+        
         variable_header = SubackVariableHeader(packet_id)
-        variable_header.mqtt5 = True  # Mark as MQTT5 packet
         
         if properties:
             variable_header.properties = properties
             
         payload = SubackPayload(return_codes)
-        packet = cls(fixed=MQTTFixedHeader(SUBACK, 0x01), variable_header=variable_header, payload=payload)
-        return packet
+        
+        return cls(fixed=fixed_header, variable_header=variable_header, payload=payload)

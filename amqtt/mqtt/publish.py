@@ -51,10 +51,30 @@ class PublishVariableHeader(MQTTVariableHeader):
             out.extend(int_to_bytes(self.packet_id, 2))
             
         # Add properties for MQTT5
-        if hasattr(self, 'mqtt5') and self.mqtt5:
+        if hasattr(self.properties, 'to_bytes') and hasattr(self, 'mqtt5') and self.mqtt5:
+            out.extend(self.properties.to_bytes())
+        elif hasattr(self.properties, 'to_bytes') and hasattr(self, '_parent') and hasattr(self._parent, 'fixed_header') and hasattr(self._parent.fixed_header, 'mqtt5') and self._parent.fixed_header.mqtt5:
             out.extend(self.properties.to_bytes())
             
         return out
+
+    @property
+    def bytes_length(self) -> int:
+        """Return the length of the variable header when encoded to bytes."""
+        length = 2 + len(self.topic_name.encode('utf-8'))  # 2 for topic length prefix
+        
+        if self.packet_id is not None:
+            length += 2  # 2 for packet_id
+            
+        # Add properties length for MQTT5
+        if hasattr(self, 'mqtt5') and self.mqtt5:
+            props_bytes = self.properties.to_bytes()
+            length += len(props_bytes)
+        elif hasattr(self, '_parent') and hasattr(self._parent, 'fixed_header') and hasattr(self._parent.fixed_header, 'mqtt5') and self._parent.fixed_header.mqtt5:
+            props_bytes = self.properties.to_bytes()
+            length += len(props_bytes)
+            
+        return length
 
 
 class PublishPayload(MQTTPayload[PublishVariableHeader]):
@@ -80,7 +100,7 @@ class PublishPayload(MQTTPayload[PublishVariableHeader]):
             
         return cls(data)
 
-    def to_bytes(self) -> bytearray:
+    def to_bytes(self, fixed_header=None, variable_header=None) -> bytearray:
         """Encode payload to bytes."""
         return bytearray(self.data)
 
@@ -226,7 +246,7 @@ class PublishPacket(MQTTPacket[PublishVariableHeader, PublishPayload, MQTTFixedH
     @classmethod
     def build_mqtt5(cls, topic_name: str, data: bytes, packet_id: int = None, qos: int = 0, retain: bool = False, dup: bool = False, properties: Properties = None) -> Self:
         """Build a PUBLISH packet for MQTT5."""
-        flags = 0x01  # MQTT5 flag
+        flags = 0x00  # Don't set MQTT5 flag in fixed header
         if qos:
             flags |= (qos << 1) & 0x06
         if retain:
@@ -235,8 +255,9 @@ class PublishPacket(MQTTPacket[PublishVariableHeader, PublishPayload, MQTTFixedH
             flags |= 0x08
             
         fixed_header = MQTTFixedHeader(PUBLISH, flags)
+        fixed_header.mqtt5 = True  # Mark as MQTT5 packet
+        
         variable_header = PublishVariableHeader(topic_name, packet_id)
-        variable_header.mqtt5 = True  # Mark as MQTT5 packet
         
         if properties:
             variable_header.properties = properties

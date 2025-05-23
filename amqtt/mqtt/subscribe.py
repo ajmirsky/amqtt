@@ -24,11 +24,13 @@ class SubscribeVariableHeader(MQTTVariableHeader):
     @classmethod
     async def from_stream(cls, reader: ReaderAdapter, fixed_header: MQTTFixedHeader) -> Self:
         """Decode variable header from stream."""
-        packet_id = await cls.read_packet_id(reader)
+        # Read packet ID (2 bytes)
+        packet_id_bytes = await read_or_raise(reader, 2)
+        packet_id = bytes_to_int(packet_id_bytes)
         var_header = cls(packet_id)
         
         # Read properties for MQTT5 packets
-        if fixed_header.flags & 0x01 == 0x01:  # MQTT5 packet flag
+        if hasattr(fixed_header, 'mqtt5') and fixed_header.mqtt5:
             var_header.properties = await Properties.from_stream(reader)
             
         return var_header
@@ -97,9 +99,11 @@ class SubscribePayload(MQTTPayload[SubscribeVariableHeader]):
         payload.subscription_options = subscription_options
         return payload
 
-    def to_bytes(self, is_mqtt5: bool = False) -> bytearray:
+    def to_bytes(self, fixed_header=None, variable_header=None) -> bytearray:
         """Encode payload to bytes."""
         out = bytearray()
+        is_mqtt5 = fixed_header and fixed_header.mqtt5
+        
         for index, (topic, qos) in enumerate(self.topics):
             out.extend(encode_string(topic))
             
@@ -192,8 +196,10 @@ class SubscribePacket(MQTTPacket[SubscribeVariableHeader, SubscribePayload, MQTT
     @classmethod
     def build_mqtt5(cls, topics: list[tuple[str, int]], packet_id: int, subscription_options: dict = None, properties: Properties = None) -> Self:
         """Build a SUBSCRIBE packet for MQTT5."""
+        fixed_header = MQTTFixedHeader(SUBSCRIBE, 0x02)  # [MQTT-3.8.1-1]
+        fixed_header.mqtt5 = True  # Mark as MQTT5 packet
+        
         variable_header = SubscribeVariableHeader(packet_id)
-        variable_header.mqtt5 = True  # Mark as MQTT5 packet
         
         if properties:
             variable_header.properties = properties
@@ -203,5 +209,4 @@ class SubscribePacket(MQTTPacket[SubscribeVariableHeader, SubscribePayload, MQTT
         if subscription_options:
             payload.subscription_options = subscription_options
             
-        packet = cls(fixed=MQTTFixedHeader(SUBSCRIBE, 0x03), variable_header=variable_header, payload=payload)
-        return packet
+        return cls(fixed=fixed_header, variable_header=variable_header, payload=payload)

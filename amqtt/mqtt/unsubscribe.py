@@ -78,7 +78,7 @@ class UnsubscribePayload(MQTTPayload):
             
         return cls(topics)
 
-    def to_bytes(self) -> bytearray:
+    def to_bytes(self, fixed_header=None, variable_header=None) -> bytearray:
         """Encode payload to bytes."""
         out = bytearray()
         for topic in self.topics:
@@ -134,6 +134,20 @@ class UnsubscribePacket(MQTTPacket[UnsubscribeVariableHeader, UnsubscribePayload
         if self.variable_header is None:
             self.variable_header = UnsubscribeVariableHeader()
         self.variable_header.properties = properties
+
+    @property
+    def packet_id(self) -> int:
+        """Return the packet ID."""
+        if self.variable_header is not None:
+            return self.variable_header.packet_id
+        return 0
+
+    @packet_id.setter
+    def packet_id(self, packet_id: int) -> None:
+        """Set the packet ID."""
+        if self.variable_header is None:
+            self.variable_header = UnsubscribeVariableHeader()
+        self.variable_header.packet_id = packet_id
 
     @classmethod
     def build(cls, topics: List[str], packet_id: int) -> Self:

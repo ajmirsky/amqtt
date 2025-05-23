@@ -30,7 +30,7 @@ def int_to_bytes(int_value: int, length: int) -> bytes:
     """Convert an integer to a sequence of bytes using big endian byte ordering.
 
     :param int_value: integer value to convert
-    :param length: byte length (must be 1 or 2)
+    :param length: byte length (1, 2, or 4)
     :return: byte sequence
     :raises ValueError: if the length is unsupported
     """
@@ -38,11 +38,12 @@ def int_to_bytes(int_value: int, length: int) -> bytes:
     fmt_mapping = {
         1: "!B",  # 1 byte, unsigned char
         2: "!H",  # 2 bytes, unsigned short
+        4: "!I",  # 4 bytes, unsigned int
     }
 
     fmt = fmt_mapping.get(length)
     if not fmt:
-        msg = "Unsupported length for int to bytes conversion. Only lengths 1 or 2 are allowed."
+        msg = "Unsupported length for int to bytes conversion. Only lengths 1, 2, or 4 are allowed."
         raise ValueError(msg)
 
     return pack(fmt, int_value)
@@ -94,6 +95,21 @@ async def decode_data_with_length(reader: ReaderAdapter | asyncio.StreamReader) 
     return await read_or_raise(reader, bytes_length)
 
 
+async def decode_binary_data(reader: ReaderAdapter | asyncio.StreamReader) -> bytes:
+    """Read binary data from a reader. Data is prefixed with 2 bytes length.
+    
+    Similar to decode_data_with_length but specifically for binary data in MQTT5 properties.
+    
+    :param reader: Stream reader
+    :return: bytes read from stream (without length).
+    """
+    length_bytes = await read_or_raise(reader, 2)
+    bytes_length = unpack("!H", length_bytes)[0]
+    if bytes_length > 0:
+        return await read_or_raise(reader, bytes_length)
+    return b""
+
+
 def encode_string(string: str) -> bytes:
     """Encode a string with its length as prefix.
 
@@ -105,10 +121,25 @@ def encode_string(string: str) -> bytes:
     return int_to_bytes(data_length, 2) + data
 
 
-def encode_data_with_length(data: bytes) -> bytes:
+def encode_data_with_length(data: bytes | int) -> bytes:
     """Encode data with its length as prefix.
 
-    :param data: data to encode
+    :param data: data to encode or an integer length
+    :return: data with length prefix or just the encoded length if data is an integer.
+    """
+    if isinstance(data, int):
+        # If data is an integer, treat it as a length value
+        return int_to_bytes(data, 2)
+    else:
+        # Otherwise, encode the data with its length prefix
+        data_length = len(data)
+        return int_to_bytes(data_length, 2) + data
+
+
+def encode_binary_data(data: bytes) -> bytes:
+    """Encode binary data with its length as prefix for MQTT5 properties.
+
+    :param data: binary data to encode
     :return: data with length prefix.
     """
     data_length = len(data)

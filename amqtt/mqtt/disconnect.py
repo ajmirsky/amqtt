@@ -107,11 +107,12 @@ class DisconnectPacket(MQTTPacket[DisconnectVariableHeader, None, MQTTFixedHeade
     @classmethod
     def build_mqtt5(cls, reason_code: int = NORMAL_DISCONNECTION, properties: Properties = None) -> Self:
         """Build a DISCONNECT packet for MQTT5."""
+        fixed_header = MQTTFixedHeader(DISCONNECT, 0x00)
+        fixed_header.mqtt5 = True  # Mark as MQTT5 packet
+        
         variable_header = DisconnectVariableHeader(reason_code)
-        variable_header.mqtt5 = True  # Mark as MQTT5 packet
         
         if properties:
             variable_header.properties = properties
             
-        packet = cls(fixed=MQTTFixedHeader(DISCONNECT, 0x01), variable_header=variable_header)
-        return packet
+        return cls(fixed=fixed_header, variable_header=variable_header)

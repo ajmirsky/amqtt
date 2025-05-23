@@ -46,6 +46,21 @@ class UnsubackVariableHeader(MQTTVariableHeader):
             
         return out
 
+    @property
+    def bytes_length(self) -> int:
+        """Return the length of the variable header when encoded to bytes."""
+        length = 2  # packet_id
+        
+        # Add properties length for MQTT5
+        if hasattr(self, 'mqtt5') and self.mqtt5:
+            props_bytes = self.properties.to_bytes()
+            length += len(props_bytes)
+        elif hasattr(self, '_parent') and hasattr(self._parent, 'fixed_header') and hasattr(self._parent.fixed_header, 'mqtt5') and self._parent.fixed_header.mqtt5:
+            props_bytes = self.properties.to_bytes()
+            length += len(props_bytes)
+            
+        return length
+
 
 class UnsubackPayload(MQTTPayload):
     """Payload for UNSUBACK packet."""
@@ -65,10 +80,6 @@ class UnsubackPayload(MQTTPayload):
         reason_codes = []
         remaining_bytes = fixed_header.remaining_length - variable_header.bytes_length
         
-        # For MQTT5, account for properties length
-        if hasattr(fixed_header, 'mqtt5') and fixed_header.mqtt5:
-            remaining_bytes -= len(variable_header.properties.to_bytes())
-        
         # For MQTT 3.1.1, there is no payload
         if not hasattr(fixed_header, 'mqtt5') or not fixed_header.mqtt5:
             return cls()
@@ -82,8 +93,13 @@ class UnsubackPayload(MQTTPayload):
             
         return cls(reason_codes)
 
-    def to_bytes(self) -> bytearray:
-        """Encode payload to bytes."""
+    def to_bytes(self, fixed_header=None, variable_header=None) -> bytearray:
+        """Encode payload to bytes.
+        
+        :param fixed_header: Optional fixed header (not used but required for compatibility)
+        :param variable_header: Optional variable header (not used but required for compatibility)
+        :return: Encoded payload bytes
+        """
         out = bytearray()
         for reason_code in self.reason_codes:
             out.append(reason_code)
@@ -139,6 +155,20 @@ class UnsubackPacket(MQTTPacket[UnsubackVariableHeader, UnsubackPayload, MQTTFix
             self.variable_header = UnsubackVariableHeader()
         self.variable_header.properties = properties
 
+    @property
+    def packet_id(self) -> int:
+        """Return the packet ID."""
+        if self.variable_header is not None:
+            return self.variable_header.packet_id
+        return 0
+
+    @packet_id.setter
+    def packet_id(self, packet_id: int) -> None:
+        """Set the packet ID."""
+        if self.variable_header is None:
+            self.variable_header = UnsubackVariableHeader()
+        self.variable_header.packet_id = packet_id
+
     @classmethod
     def build(cls, packet_id: int) -> Self:
         """Build an UNSUBACK packet for MQTT 3.1.1."""
@@ -148,14 +178,17 @@ class UnsubackPacket(MQTTPacket[UnsubackVariableHeader, UnsubackPayload, MQTTFix
     @classmethod
     def build_mqtt5(cls, packet_id: int, reason_codes: List[int] = None, properties: Properties = None) -> Self:
         """Build an UNSUBACK packet for MQTT5."""
+        fixed_header = MQTTFixedHeader(UNSUBACK, 0x00)
+        fixed_header.mqtt5 = True  # Mark as MQTT5 packet
+        
         variable_header = UnsubackVariableHeader(packet_id)
-        variable_header.mqtt5 = True  # Mark as MQTT5 packet
         
         if properties:
             variable_header.properties = properties
             
-        payload = UnsubackPayload(reason_codes or [SUCCESS])
-        fixed_header = MQTTFixedHeader(UNSUBACK, 0x00)
-        fixed_header.mqtt5 = True  # Mark as MQTT5 packet
+        payload = UnsubackPayload(reason_codes or [])
+        
+        # Correctly set the reason codes and MQTT5 flag
+        fixed_header.remaining_length = 2 + len(payload.to_bytes()) + len(variable_header.to_bytes())
         
         return cls(fixed=fixed_header, variable_header=variable_header, payload=payload)

@@ -23,18 +23,19 @@ UNSUBACK = 0x0B
 PINGREQ = 0x0C
 PINGRESP = 0x0D
 DISCONNECT = 0x0E
-RESERVED_15 = 0x0F
-
+AUTH = 0x0F  # MQTT5 AUTH packet type
+RESERVED_15 = 0x0F  # Same as AUTH, kept for backward compatibility
 
 class MQTTFixedHeader:
     """Represents the fixed header of an MQTT packet."""
 
-    __slots__ = ("flags", "packet_type", "remaining_length")
+    __slots__ = ("flags", "packet_type", "remaining_length", "mqtt5")
 
     def __init__(self, packet_type: int, flags: int = 0, length: int = 0) -> None:
         self.packet_type = packet_type
         self.flags = flags
         self.remaining_length = length
+        self.mqtt5 = False  # Default to MQTT 3.1.1
 
     def to_bytes(self) -> bytes:
         """Encode the fixed header to bytes."""
