@@ -1,6 +1,6 @@
 import asyncio
 from collections import deque
-from collections.abc import Callable, Coroutine
+from collections.abc import AsyncIterator, Callable, Coroutine
 import contextlib
 import copy
 from functools import wraps
@@ -19,7 +19,7 @@ from amqtt.adapters import (
     WebSocketsReader,
     WebSocketsWriter,
 )
-from amqtt.errors import ClientError, ConnectError, ProtocolHandlerError
+from amqtt.errors import ClientError, ConnectError, MQTTError, ProtocolHandlerError
 from amqtt.mqtt.connack import CONNECTION_ACCEPTED
 from amqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
 from amqtt.mqtt.protocol.client_handler import ClientProtocolHandler
@@ -601,3 +601,32 @@ class MQTTClient:
             session.will_qos = self.config["will"]["qos"]
 
         return session
+
+    @property
+    def messages(self) -> AsyncIterator[ApplicationMessage]:
+        """Alternative approach to receiving messages with an async loop."""
+        if self._handler is None:
+            msg = "Handler is not initialized."
+            raise ClientError(msg)
+
+        return MQTTMessageIterator(self)
+
+
+class MQTTMessageIterator:
+    """Asynchronous iterator for delivering messages from the client."""
+
+    def __init__(self, client: MQTTClient) -> None:
+        self.client = client
+
+    def __aiter__(self) -> AsyncIterator[ApplicationMessage]:
+        """Return the iterator."""
+        return self
+
+    async def __anext__(self) -> ApplicationMessage:
+        """Return the next message."""
+        while True:
+            message = await self.client.deliver_message()
+            if message:
+                return message
+            msg = "Could not receive messages."
+            raise MQTTError(msg)
