@@ -8,6 +8,8 @@ from importlib.metadata import EntryPoint, EntryPoints, entry_points
 import logging
 from typing import Any, NamedTuple
 
+from amqtt.errors import BrokerError
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -79,7 +81,11 @@ class PluginManager:
     def _load_plugin(self, ep: EntryPoint) -> Plugin | None:
         try:
             self.logger.debug(f" Loading plugin {ep!s}")
-            plugin = ep.load()
+            try:
+                plugin = ep.load()
+            except AttributeError as e:
+                msg = f"Could not load plugin: {ep.name}"
+                raise BrokerError(msg) from e
             self.logger.debug(f" Initializing plugin {ep!s}")
 
             plugin_context = copy.copy(self.app_context)

@@ -142,7 +142,7 @@ class MQTTClient:
             [CONNACK](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718033)'s return code
 
         Raises:
-            amqtt.client.ConnectException: if connection fails
+            ConnectError: if connection fails
 
         """
         additional_headers = additional_headers if additional_headers is not None else {}

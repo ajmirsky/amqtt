@@ -1,7 +1,7 @@
 import asyncio
 from typing import Any
 
-from amqtt.errors import AMQTTError
+from amqtt.errors import AMQTTError, NoDataError, ConnectError
 from amqtt.mqtt.connack import ConnackPacket
 from amqtt.mqtt.connect import ConnectPacket, ConnectPayload, ConnectVariableHeader
 from amqtt.mqtt.disconnect import DisconnectPacket
@@ -88,7 +88,10 @@ class ClientProtocolHandler(ProtocolHandler):
             msg = "Reader is not initialized."
             raise AMQTTError(msg)
 
-        connack = await ConnackPacket.from_stream(self.reader)
+        try:
+            connack = await ConnackPacket.from_stream(self.reader)
+        except NoDataError as e:
+            raise ConnectError from e
         await self.plugins_manager.fire_event(EVENT_MQTT_PACKET_RECEIVED, packet=connack, session=self.session)
         return connack.return_code
 
