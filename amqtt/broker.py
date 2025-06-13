@@ -65,7 +65,9 @@ class Action(Enum):
     """Actions issued by the broker."""
 
     SUBSCRIBE = "subscribe"
+    """What happens when a client subscribes or broker tries to publish to that client."""
     PUBLISH = "publish"
+    """Occurs when a client tries to publish a message."""
 
 
 class RetainedApplicationMessage(ApplicationMessage):

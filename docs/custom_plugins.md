@@ -39,6 +39,8 @@ implements one or more of these methods:
 - `on_broker_message_received`
 
 
+::: amqtt.broker.Action
+
 ## Authentication Plugins
 
 Of the plugins listed in `project.entry-points`, one or more can be used to validate client sessions

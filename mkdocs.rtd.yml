@@ -120,6 +120,7 @@ markdown_extensions:
 
 plugins:
   - search
+  - my_custom_plugin
   - autorefs
   - open-in-new-tab
   - markdown-exec

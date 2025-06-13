@@ -114,6 +114,10 @@ topic_acl = "amqtt.plugins.topic_checking:TopicAccessControlListPlugin"
 broker_sys = "amqtt.plugins.sys.broker:BrokerSysPlugin"
 # --8<-- [end:included]
 
+[project.entry-points."mkdocs.plugins"]
+my_custom_plugin = "amqtt.mkdocs_augment:MyPlugin"
+
+
 
 [project.entry-points."amqtt.client.plugins"]
 packet_logger_plugin = "amqtt.plugins.logging_amqtt:PacketLoggerPlugin"
