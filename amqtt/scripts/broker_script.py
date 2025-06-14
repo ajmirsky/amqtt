@@ -1,17 +1,3 @@
-"""aMQTT - MQTT 3.1.1 broker.
-
-Usage:
-    amqtt --version
-    amqtt (-h | --help)
-    amqtt [-c <config_file> ] [-d]
-
-Options:
-    -h --help           Show this screen.
-    --version           Show version.
-    -c <config_file>    Broker configuration file (YAML format)
-    -d                  Enable debug messages
-"""
-
 import asyncio
 import logging
 from pathlib import Path
@@ -21,29 +7,13 @@ from yaml.parser import ParserError
 
 from amqtt import __version__ as amqtt_version
 from amqtt.broker import Broker
-from amqtt.errors import BrokerError
+from amqtt.errors import BrokerError, PluginError
 from amqtt.utils import read_yaml_config
-
-default_config = {
-    "listeners": {
-        "default": {
-            "type": "tcp",
-            "bind": "0.0.0.0:1883",
-        },
-    },
-    "sys_interval": 10,
-    "auth": {
-        "allow-anonymous": True,
-        "password-file": Path(__file__).parent / "passwd",
-        "plugins": ["auth_file", "auth_anonymous"],
-    },
-    "topic-check": {"enabled": False},
-}
 
 logger = logging.getLogger(__name__)
 
 
-app = typer.Typer(rich_markup_mode=None)
+app = typer.Typer(add_completion=False, rich_markup_mode=None)
 
 
 def main() -> None:
@@ -59,7 +29,7 @@ def _version(v:bool) -> None:
 
 @app.command()
 def broker_main(
-        config_file: str | None = typer.Option(None, "-c", help="Broker configuration file (YAML format)"),
+        config_file: str | None = typer.Option(None, "-c", help="broker configuration file"),
         debug: bool = typer.Option(False, "-d", help="Enable debug messages"),
         version: bool = typer.Option(  # noqa : ARG001
             False,
@@ -69,7 +39,7 @@ def broker_main(
             help="Show version and exit",
         ),
 ) -> None:
-    """Run the MQTT broker."""
+    """Command-line script for running a MQTT 3.1.1 broker."""
     formatter = "[%(asctime)s] :: %(levelname)s - %(message)s"
 
     level = logging.DEBUG if debug else logging.INFO
@@ -85,20 +55,21 @@ def broker_main(
         raise typer.Exit(code=1) from exc
 
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
         broker = Broker(config)
-    except (BrokerError, ParserError) as exc:
+    except (BrokerError, ParserError, PluginError) as exc:
         typer.echo(f"❌ Broker failed to start: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
+    _ = loop.create_task(broker.start())  #noqa : RUF006
     try:
-        loop.run_until_complete(broker.start())
         loop.run_forever()
     except KeyboardInterrupt:
         loop.run_until_complete(broker.shutdown())
     except Exception as exc:
-        typer.echo("❌ Connection failed", err=True)
+        typer.echo("❌ Broker execution halted", err=True)
         raise typer.Exit(code=1) from exc
     finally:
         loop.close()

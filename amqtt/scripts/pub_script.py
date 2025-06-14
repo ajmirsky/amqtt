@@ -74,10 +74,10 @@ class CAInfo:
 
 async def do_pub(
     client: MQTTClient,
-    url: str,
     topic: str,
     message_input: MessageInput,
     ca_info: CAInfo,
+    url: str | None = None,
     clean_session: bool = False,
     retain: bool = False,
     extra_headers_json: str | None = None,
@@ -112,13 +112,13 @@ async def do_pub(
         await client.disconnect()
         logger.info(f"{client.client_id} Disconnected from broker")
     except ConnectError as ce:
-        logger.fatal(f"Connection to '{url}' failed: {ce!r}")
+        logger.fatal(f"Connection to '{client.session.broker_uri if client.session else url}' failed")
         raise ConnectError from ce
     except asyncio.CancelledError as ce:
         logger.fatal("Publish canceled due to previous error")
         raise asyncio.CancelledError from ce
 
-app = typer.Typer(rich_markup_mode=None)
+app = typer.Typer(add_completion=False, rich_markup_mode=None)
 
 
 def main() -> None:
@@ -133,42 +133,34 @@ def _version(v: bool) -> None:
 
 @app.command()
 def publisher_main(  # pylint: disable=R0914,R0917  # noqa : PLR0913
-    url: str = typer.Option(..., "--url", help="Broker connection URL (must conform to MQTT URI scheme: mqtt://<username:password>@HOST:port)"),
-    config_file: str | None = typer.Option(None, "-c", "--config-file", help="Broker configuration file (YAML format)"),
-    client_id: str | None = typer.Option(None, "-i", "--client-id", help="Client ID to use for the connection"),
+    url: str | None = typer.Option(None, "--url", help="Broker connection URL, *must conform to MQTT or URI scheme: `[mqtt(s)|ws(s)]://<username:password>@HOST:port`*"),
+    config_file: str | None = typer.Option(None, "-c", "--config-file", help="Client configuration file"),
+    client_id: str | None = typer.Option(None, "-i", "--client-id", help="client identification for mqtt connection. *default: process id and the hostname of the client*"),
     qos: int = typer.Option(0, "--qos", "-q", help="Quality of service (0, 1, or 2)"),
     retain: bool = typer.Option(False, "-r", help="Set retain flag on connect"),
-    topic: str = typer.Option(..., "-t", help="Message topic"),
-    message: str | None = typer.Option(None, "-m", help="Message data to send"),
-    file: str | None = typer.Option(None, "-f", help="Read file by line and publish each line as a message"),
-    stdin: bool = typer.Option(False, "-s", help="Read from stdin and publish message for first line"),
-    lines: bool = typer.Option(False, "-l", help="Read from stdin and publish message for each line"),
-    no_message: bool = typer.Option(False, "-n", help="Publish an empty message"),
-    keep_alive: int | None = typer.Option(None, "-k", help="Keep alive timeout in seconds"),
-    clean_session: bool = typer.Option(False, "--clean-session", help="Clean session on connect (defaults to False)"),
+    topic: str = typer.Option(..., "-t", "--topic", help="Message topic"),
+    message: str | None = typer.Option(None, "-m", "--message", help="Message data to send"),
+    file: str | None = typer.Option(None, "-f", "--file", help="Path to file, will publish each line as a separate message."),
+    stdin: bool = typer.Option(False, "-s", "--stdin", help="Read from standard input, all content read is sent as a single message."),
+    lines: bool = typer.Option(False, "-l", "--lines", help="Read from stdin, will publish message for each line."),
+    no_message: bool = typer.Option(False, "-n", "--no-message", help="Publish an empty (null, zero length) message"),
+    keep_alive: int | None = typer.Option(None, "-k", help="Keep alive timeout, in seconds."),
+    clean_session: bool = typer.Option(False, "--clean-session", help="Clean session on connect. *default: False*"),
     ca_file: str | None = typer.Option(None, "--ca-file", help="Define the path to a file containing PEM encoded CA certificates that are trusted. Used to enable SSL communication."),
     ca_path: str | None = typer.Option(None, "--ca-path", help="Define the path to a directory containing PEM encoded CA certificates that are trusted. Used to enable SSL communication."),
     ca_data: str | None = typer.Option(None, "--ca-data", help="Set the PEM encoded CA certificates that are trusted. Used to enable SSL communication."),
     will_topic: str | None = typer.Option(None, "--will-topic", help="The topic on which to send a Will, in the event that the client disconnects unexpectedly."),
-    will_message: str | None = typer.Option(None, "--will-message", help="Specify a message that will be stored by the broker and sent out if this client disconnects unexpectedly. [required if `--will-topic` is specified]."),
-    will_qos: int | None = typer.Option(0, "--will-qos", help="The QoS to use for the Will. [default: 0, only valid if `--will-topic` is specified]."),
-    will_retain: bool = typer.Option(False, "--will-retain", help="If the client disconnects unexpectedly the message sent out will be treated as a retained message. [optional, only valid if `--will-topic` is specified]."),
-    extra_headers_json: str | None = typer.Option(
-        None, "--extra-headers", help="Specify a JSON object string with key-value pairs representing additional headers that are transmitted on the initial connection (websocket connections only)."
-    ),
+    will_message: str | None = typer.Option(None, "--will-message", help="Specify a message that will be stored by the broker and sent out if this client disconnects unexpectedly. *required if `--will-topic` is specified*."),
+    will_qos: int = typer.Option(0, "--will-qos", help="The QoS to use for the Will. *default: 0, only valid if `--will-topic` is specified*"),
+    will_retain: bool = typer.Option(False, "--will-retain", help="If the client disconnects unexpectedly the message sent out will be treated as a retained message. *only valid, if `--will-topic` is specified*"),
+    extra_headers_json: str | None = typer.Option(None, "--extra-headers", help="Specify a JSON object string with key-value pairs representing additional headers that are transmitted on the initial connection. *websocket connections only*."),
     debug: bool = typer.Option(False, "-d", help="Enable debug messages"),
-    version: bool | None = typer.Option(  # noqa : ARG001
-        None,
-        "--version",
-        callback=_version,
-        is_eager=True,
-        help="Show version and exit",
-    ),
+    version: bool = typer.Option(False, "--version", callback=_version, is_eager=True, help="Show version and exit"), # noqa : ARG001
 ) -> None:
-    """Run the MQTT publisher."""
+    """Command-line MQTT client for publishing simple messages."""
     provided = [bool(message), bool(file), stdin, lines, no_message]
     if sum(provided) != 1:
-        typer.echo("❌ You must provide exactly one of --config, --file, or --stdin.", err=True)
+        typer.echo("❌ You must provide exactly one of --message, --file, --stdin, --lines or --no-message", err=True)
         raise typer.Exit(code=1)
 
     if bool(will_message) != bool(will_topic):
@@ -190,8 +182,6 @@ def publisher_main(  # pylint: disable=R0914,R0917  # noqa : PLR0913
         logger.debug(f"Using default configuration from {default_config_path}")
         config = read_yaml_config(default_config_path)
 
-    loop = asyncio.get_event_loop()
-
     if not client_id:
         client_id = _gen_client_id()
 
@@ -202,12 +192,11 @@ def publisher_main(  # pylint: disable=R0914,R0917  # noqa : PLR0913
     if keep_alive:
         config["keep_alive"] = int(keep_alive)
 
-
-    if will_topic and will_message and will_qos is not None and will_retain:
+    if will_topic and will_message:
         config["will"] = {
             "topic": will_topic,
-            "message": will_message.encode(),
-            "qos": will_qos,
+            "message": will_message,
+            "qos": int(will_qos),
             "retain": will_retain,
         }
 
@@ -226,7 +215,7 @@ def publisher_main(  # pylint: disable=R0914,R0917  # noqa : PLR0913
     )
     with contextlib.suppress(KeyboardInterrupt):
         try:
-            loop.run_until_complete(
+            asyncio.run(
                 do_pub(
                     client=client,
                     message_input=message_input,
@@ -242,8 +231,6 @@ def publisher_main(  # pylint: disable=R0914,R0917  # noqa : PLR0913
         except (ClientError, ConnectError) as exc:
             typer.echo("❌ Connection failed", err=True)
             raise typer.Exit(code=1) from exc
-
-    loop.close()
 
 
 if __name__ == "__main__":

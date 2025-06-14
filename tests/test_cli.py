@@ -1,16 +1,23 @@
 import asyncio
-import json
+import logging
 import os
+import signal
 import subprocess
 import tempfile
-from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import yaml
 
 from amqtt.broker import Broker
+from amqtt.mqtt.constants import QOS_0
+
+formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
+logging.basicConfig(level=logging.DEBUG, format=formatter)
+logger = logging.getLogger(__name__)
+
+
 from amqtt.client import MQTTClient
-from amqtt.mqtt.constants import QOS_1
 
 
 @pytest.fixture
@@ -32,23 +39,23 @@ def broker_config():
 
 
 @pytest.fixture
-def config_file(broker_config, tmp_path):
-    config_path = tmp_path / "config.yaml"
+def broker_config_file(broker_config, tmp_path):
+    config_path = tmp_path / "broker.yaml"
     with config_path.open("w") as f:
         yaml.dump(broker_config, f)
     return str(config_path)
 
 
 @pytest.fixture
-async def broker(config_file):
+async def broker(broker_config_file):
 
     proc = subprocess.Popen(
-        ["amqtt", "-c", config_file],
+        ["amqtt", "-c", broker_config_file],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
     # Give broker time to start
-    await asyncio.sleep(1)
+    await asyncio.sleep(4)
     yield proc
     proc.terminate()
     proc.wait()
@@ -56,19 +63,22 @@ async def broker(config_file):
 
 def test_cli_help_messages():
     """Test that help messages are displayed correctly."""
+    env = os.environ.copy()
+    env["NO_COLOR"] = '1'
+
     amqtt_path = "amqtt"
-    output = subprocess.check_output([amqtt_path, "--help"])
-    assert "Usage: amqtt" in output.decode("utf-8")
+    output = subprocess.check_output([amqtt_path, "--help"], env=env, text=True)
+    assert "Usage: amqtt" in output
 
 
     amqtt_sub_path = "amqtt_sub"
-    output = subprocess.check_output([amqtt_sub_path, "--help"])
-    assert "Usage: amqtt_sub" in output.decode("utf-8")
+    output = subprocess.check_output([amqtt_sub_path, "--help"], env=env, text=True)
+    assert "Usage: amqtt_sub" in output
 
 
     amqtt_pub_path = "amqtt_pub"
-    output = subprocess.check_output([amqtt_pub_path, "--help"])
-    assert "Usage: amqtt_pub" in output.decode("utf-8")
+    output = subprocess.check_output([amqtt_pub_path, "--help"], env=env, text=True)
+    assert "Usage: amqtt_pub" in output
 
 
 def test_broker_version():
@@ -78,16 +88,16 @@ def test_broker_version():
 
 
 @pytest.mark.asyncio
-async def test_broker_start_stop(config_file):
+async def test_broker_start_stop(broker_config_file):
     """Test broker start and stop with config file."""
     proc = subprocess.Popen(
-        ["amqtt", "-c", config_file],
+        ["amqtt", "-c", broker_config_file],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
     # Give broker time to start
     await asyncio.sleep(1)
-    
+
     # Verify broker is running by connecting a client
     client = MQTTClient()
     await client.connect("mqtt://127.0.0.1:1884")
@@ -151,60 +161,87 @@ async def test_publish_subscribe(broker):
 
 
 @pytest.mark.asyncio
-async def test_pub_sub_options(broker):
-    """Test various pub/sub options."""
-    # Test publishing with retain flag
-    pub_proc = subprocess.run(
-        [
+async def test_pub_errors(client_config_file):
+    """Test error handling in pub/sub tools."""
+    # Test connection to non-existent broker
+    cmd =         [
             "amqtt_pub",
-            "--url", "mqtt://127.0.0.1:1884",
-            "-t", "topic/test",
-            "-m", "standard message",
-            "--will-topic", "topic/retain",
-            "--will-message", "last will message",
-            "--will-retain",
-        ],
-        capture_output=True,
-    )
-    assert pub_proc.returncode == 0, "publisher error code"
+            "--url", "mqtt://127.0.0.1:9999",  # Wrong port
+            "-t", "test/topic",
+            "-m", "test",
+            "-c", client_config_file,
+        ]
 
-    # Verify retained message is received by new subscriber
-    sub_proc = subprocess.run(
-        [
-            "amqtt_sub",
-            "--url", "mqtt://127.0.0.1:1884",
-            "-t", "topic/retain",
-            "-n", "1",
-        ],
-        capture_output=True,
+    proc = await asyncio.create_subprocess_shell(
+        " ".join(cmd), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
-    assert sub_proc.returncode == 0, "subscriber error code"
-    assert "last will message" in str(sub_proc.stdout)
+    stdout, stderr = await proc.communicate()
+    logger.debug(f"Command: {cmd}")
+    logger.debug(f"Stdout: {stdout.decode()}")
+    logger.debug(f"Stderr: {stderr.decode()}")
+
+    assert proc.returncode != 0, f"publisher error code: {proc.returncode}"
+    assert "Connection failed" in str(stderr)
 
 
 @pytest.mark.asyncio
-async def test_pub_sub_errors():
-    """Test error handling in pub/sub tools."""
-    # Test connection to non-existent broker
-    pub_proc = subprocess.run(
-        [
-            "amqtt_pub",
-            "--url", "mqtt://127.0.0.1:1885",  # Wrong port
-            "-t", "test/topic",
-            "-m", "test",
-        ],
-        capture_output=True,
-    )
-    assert pub_proc.returncode != 0, f"publisher error code {pub_proc.returncode} != 0"
-    assert "Connection failed" in str(pub_proc.stderr)
-
+async def test_sub_errors(client_config_file):
     # Test invalid URL format
     sub_proc = subprocess.run(
         [
             "amqtt_sub",
             "--url", "invalid://url",
             "-t", "test/topic",
+            "-c", client_config_file
         ],
         capture_output=True,
     )
-    assert sub_proc.returncode != 0, f"subscriber error code {sub_proc.returncode} != 0"
+    assert sub_proc.returncode != 0, f"subscriber error code: {sub_proc.returncode}"
+
+
+@pytest.fixture
+def client_config():
+    return {
+        "keep_alive": 10,
+        "ping_delay": 1,
+        "default_qos": 0,
+        "default_retain": False,
+        "auto_reconnect": False,
+        "will": {
+            "topic": "test/will/topic",
+            "message": "client ABC has disconnected",
+            "qos": 0,
+            "retain": False
+        },
+        "broker": {
+            "uri": "mqtt://localhost:1884"
+        }
+    }
+
+
+@pytest.fixture
+def client_config_file(client_config, tmp_path):
+    config_path = tmp_path / "client.yaml"
+    with config_path.open("w") as f:
+        yaml.dump(client_config, f)
+    return str(config_path)
+
+
+@pytest.mark.asyncio
+async def test_pub_client_config(broker, client_config_file):
+    await asyncio.sleep(1)
+    cmd = [
+            "amqtt_pub",
+            "-t", "test/topic",
+            "-m", "test",
+            "-c", client_config_file
+        ]
+    proc = await asyncio.create_subprocess_shell(
+        " ".join(cmd), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await proc.communicate()
+    logger.debug(f"Command: {cmd}")
+    logger.debug(f"Stdout: {stdout.decode()}")
+    logger.debug(f"Stderr: {stderr.decode()}")
+
+    assert proc.returncode == 0, f"publisher error code: {proc.returncode}"

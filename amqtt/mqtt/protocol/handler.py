@@ -17,7 +17,7 @@ except ImportError:
 import collections
 import itertools
 import logging
-from typing import cast
+from typing import Generic, TypeVar, cast
 
 from amqtt.adapters import ReaderAdapter, WriterAdapter
 from amqtt.errors import AMQTTError, MQTTError, NoDataError, ProtocolHandlerError
@@ -56,19 +56,20 @@ from amqtt.mqtt.suback import SubackPacket
 from amqtt.mqtt.subscribe import SubscribePacket
 from amqtt.mqtt.unsuback import UnsubackPacket
 from amqtt.mqtt.unsubscribe import UnsubscribePacket
-from amqtt.plugins.manager import PluginManager
+from amqtt.plugins.manager import BaseContext, PluginManager
 from amqtt.session import INCOMING, OUTGOING, ApplicationMessage, IncomingApplicationMessage, OutgoingApplicationMessage, Session
 
 EVENT_MQTT_PACKET_SENT = "mqtt_packet_sent"
 EVENT_MQTT_PACKET_RECEIVED = "mqtt_packet_received"
 
+C = TypeVar("C", bound=BaseContext)
 
-class ProtocolHandler:
+class ProtocolHandler(Generic[C]):
     """Class implementing the MQTT communication protocol using asyncio features."""
 
     def __init__(
         self,
-        plugins_manager: PluginManager,
+        plugins_manager: PluginManager[C],
         session: Session | None = None,
         loop: asyncio.AbstractEventLoop | None = None,
     ) -> None:
@@ -79,7 +80,7 @@ class ProtocolHandler:
             self.session: Session | None = None
         self.reader: ReaderAdapter | None = None
         self.writer: WriterAdapter | None = None
-        self.plugins_manager: PluginManager = plugins_manager
+        self.plugins_manager: PluginManager[C] = plugins_manager
 
         try:
             self._loop = loop if loop is not None else asyncio.get_running_loop()
@@ -152,7 +153,8 @@ class ProtocolHandler:
             if self.writer is not None:
                 await self.writer.close()
         except asyncio.CancelledError:
-            self.logger.debug("Writer close was cancelled.", exc_info=True)
+            # canceling the task is the expected result
+            self.logger.debug("Writer close was cancelled.")
         except TimeoutError:
             self.logger.debug("Writer close operation timed out.", exc_info=True)
         except OSError:
@@ -198,7 +200,7 @@ class ProtocolHandler:
     async def mqtt_publish(
         self,
         topic: str,
-        data: bytes,
+        data: bytes | bytearray ,
         qos: int | None,
         retain: bool,
         ack_timeout: int | None = None,
@@ -446,7 +448,7 @@ class ProtocolHandler:
         self.logger.debug(f"{self.session.client_id} Starting reader coro")
         running_tasks: collections.deque[asyncio.Task[None]] = collections.deque()
         keepalive_timeout: int | None = self.session.keep_alive
-        if keepalive_timeout and keepalive_timeout <= 0:
+        if keepalive_timeout is not None and keepalive_timeout <= 0:
             keepalive_timeout = None
         while True:
             try:

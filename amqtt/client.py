@@ -5,6 +5,7 @@ import contextlib
 import copy
 from functools import wraps
 import logging
+from pathlib import Path
 import ssl
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 from urllib.parse import urlparse, urlunparse
@@ -24,20 +25,12 @@ from amqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
 from amqtt.mqtt.protocol.client_handler import ClientProtocolHandler
 from amqtt.plugins.manager import BaseContext, PluginManager
 from amqtt.session import ApplicationMessage, OutgoingApplicationMessage, Session
-from amqtt.utils import gen_client_id
+from amqtt.utils import gen_client_id, read_yaml_config
 
 if TYPE_CHECKING:
     from websockets.asyncio.client import ClientConnection
 
-_defaults: dict[str, Any] = {
-    "keep_alive": 10,
-    "ping_delay": 1,
-    "default_qos": 0,
-    "default_retain": False,
-    "auto_reconnect": True,
-    "reconnect_max_interval": 10,
-    "reconnect_retries": 2,
-}
+_defaults: dict[str, Any] | None = read_yaml_config(Path(__file__).parent / "scripts/default_client.yaml")
 
 
 class ClientContext(BaseContext):
@@ -87,17 +80,22 @@ def mqtt_connected(func: _F) -> _F:
 class MQTTClient:
     """MQTT client implementation.
 
-    MQTTClient instances provides API for connecting to a broker and send/receive messages using the MQTT protocol.
+    MQTTClient instances provides API for connecting to a broker and send/receive
+     messages using the MQTT protocol.
 
-    :param client_id: MQTT client ID to use when connecting to the broker.
-    If none, it will generated randomly by :func:`amqtt.utils.gen_client_id`
-    :param config: Client configuration
-    :return: class instance
+    Args:
+        client_id: MQTT client ID to use when connecting to the broker. If none,
+            it will be generated randomly by `amqtt.utils.gen_client_id`
+        config: dictionary of configuration options (see [client configuration](client_config.md)).
+
+    Raises:
+        PluginError
+
     """
 
     def __init__(self, client_id: str | None = None, config: dict[str, Any] | None = None) -> None:
         self.logger = logging.getLogger(__name__)
-        self.config = copy.deepcopy(_defaults)
+        self.config = copy.deepcopy(_defaults or {})
         if config is not None:
             self.config.update(config)
         self.client_id = client_id if client_id is not None else gen_client_id()
@@ -112,7 +110,7 @@ class MQTTClient:
         # Init plugins manager
         context = ClientContext()
         context.config = self.config
-        self.plugins_manager = PluginManager("amqtt.client.plugins", context)
+        self.plugins_manager: PluginManager[ClientContext] = PluginManager("amqtt.client.plugins", context)
         self.client_tasks: deque[asyncio.Task[Any]] = deque()
 
     async def connect(
@@ -129,27 +127,31 @@ class MQTTClient:
         At first, a network connection is established with the server
         using the given protocol (``mqtt``, ``mqtts``, ``ws`` or ``wss``).
         Once the socket is connected, a
-        `CONNECT <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718028>`_
+        [CONNECT](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718028>)
         message is sent with the requested information.
 
-        This method is a *coroutine*.
+        Args:
+            uri: Broker URI connection, conforming to
+                [MQTT URI scheme](https://github.com/mqtt/mqtt.github.io/wiki/URI-Scheme). default,
+                will be taken from the ``uri`` config attribute.
+            cleansession: MQTT CONNECT clean session flag
+            cafile: server certificate authority file (optional, used for secured connection)
+            capath: server certificate authority path (optional, used for secured connection)
+            cadata: server certificate authority data (optional, used for secured connection)
+            additional_headers: a dictionary with additional http headers that should be sent on the
+                initial connection (optional, used only with websocket connections)
 
-        :param uri: Broker URI connection, conforming to
-        `MQTT URI scheme <https://github.com/mqtt/mqtt.github.io/wiki/URI-Scheme>`_.
-        Uses ``uri`` config attribute by default.
-        :param cleansession: MQTT CONNECT clean session flag
-        :param cafile: server certificate authority file (optional, used for secured connection)
-        :param capath: server certificate authority path (optional, used for secured connection)
-        :param cadata: server certificate authority data (optional, used for secured connection)
-        :param additional_headers: a dictionary with additional http headers that should be sent on the initial connection
-        (optional, used only with websocket connections)
-        :return: `CONNACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718033>`_ return code
-        :raise: :class:`amqtt.client.ConnectException` if connection fails
+        Returns:
+            [CONNACK](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718033)'s return code
+
+        Raises:
+            ClientError, ConnectError
+
         """
         additional_headers = additional_headers if additional_headers is not None else {}
         self.session = self._init_session(uri, cleansession, cafile, capath, cadata)
         self.additional_headers = additional_headers
-        self.logger.debug(f"Connecting to: {uri}")
+        self.logger.debug(f"Connecting to: {self.session.broker_uri}")
 
         try:
             return await self._do_connect()
@@ -157,7 +159,7 @@ class MQTTClient:
             msg = "Future or Task was cancelled"
             raise ConnectError(msg) from e
         except Exception as e:
-            self.logger.warning(f"Connection failed: {e}")
+            self.logger.warning(f"Connection failed: {e!r}")
             if not self.config.get("auto_reconnect", False):
                 raise
             return await self.reconnect()
@@ -165,9 +167,9 @@ class MQTTClient:
     async def disconnect(self) -> None:
         """Disconnect from the connected broker.
 
-        This method sends a `DISCONNECT <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718090>`
+        This method sends a [DISCONNECT](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718090)
         message and closes the network socket.
-        This method is a *coroutine*.
+
         """
         await self.cancel_tasks()
 
@@ -197,15 +199,19 @@ class MQTTClient:
         """Reconnect a previously connected broker.
 
         Reconnection tries to establish a network connection
-        and send a `CONNECT <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718028>`_ message.
+        and send a [CONNECT](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718028) message.
         Retries interval and attempts can be controlled with the ``reconnect_max_interval``
         and ``reconnect_retries`` configuration parameters.
 
-        This method is a *coroutine*.
+        Args:
+            cleansession: clean session flag used in MQTT CONNECT messages sent for reconnections.
 
-        :param cleansession: clean session flag used in MQTT CONNECT messages sent for reconnections.
-        :return: `CONNACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718033>`_ return code
-        :raise: :class:`amqtt.client.ConnectException` if re-connection fails after max retries.
+        Returns:
+            [CONNACK](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718033) return code
+
+        Raises:
+            amqtt.client.ConnectException: if re-connection fails after max retries.
+
         """
         if self.session and self.session.transitions.is_connected():
             self.logger.warning("Client already connected")
@@ -216,7 +222,7 @@ class MQTTClient:
         self.logger.debug(f"Reconnecting with session parameters: {self.session}")
 
         reconnect_max_interval = self.config.get("reconnect_max_interval", 10)
-        reconnect_retries = self.config.get("reconnect_retries", 5)
+        reconnect_retries = self.config.get("reconnect_retries", 2)
         nb_attempt = 1
 
         while True:
@@ -227,9 +233,11 @@ class MQTTClient:
                 msg = "Future or Task was cancelled"
                 raise ConnectError(msg) from e
             except Exception as e:
-                self.logger.warning(f"Reconnection attempt failed: {e}")
-                if reconnect_retries < nb_attempt:  # reconnect_retries >= 0 and
+                self.logger.warning(f"Reconnection attempt failed: {e!r}")
+                self.logger.debug("", exc_info=True)
+                if 0 <= reconnect_retries < nb_attempt:
                     self.logger.exception("Maximum connection attempts reached. Reconnection aborted.")
+                    self.logger.debug("", exc_info=True)
                     msg = "Too many failed attempts"
                     raise ConnectError(msg) from e
                 delay = min(reconnect_max_interval, 2**nb_attempt)
@@ -246,10 +254,9 @@ class MQTTClient:
     async def ping(self) -> None:
         """Ping the broker.
 
-        Send a MQTT `PINGREQ <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718081>`_
+        Send a MQTT [PINGREQ](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718081)
         message for response.
 
-        This method is a *coroutine*.
         """
         if self.session and self._handler and self.session.transitions.is_connected():
             await self._handler.mqtt_ping()
@@ -271,16 +278,20 @@ class MQTTClient:
     ) -> OutgoingApplicationMessage:
         """Publish a message to the broker.
 
-        Send a MQTT `PUBLISH <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718037>`_
+        Send a MQTT [PUBLISH](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718037)
         message and wait for acknowledgment depending on Quality Of Service
 
-        This method is a *coroutine*.
+        Args:
+            topic: topic name to which message data is published
+            message: payload message (as bytes) to send.
+            qos: requested publish quality of service : QOS_0, QOS_1 or QOS_2. Defaults to `default_qos`
+                config parameter or QOS_0.
+            retain: retain flag. Defaults to ``default_retain`` config parameter or False.
+            ack_timeout: duration to wait for connection acknowledgment from broker.
 
-        :param topic: topic name to which message data is published
-        :param message: payload message (as bytes) to send.
-        :param qos: requested publish quality of service : QOS_0, QOS_1 or QOS_2. Defaults to ``default_qos``
-        config parameter or QOS_0.
-        :param retain: retain flag. Defaults to ``default_retain`` config parameter or False.
+        Returns:
+            the message that was sent
+
         """
         if self._handler is None:
             msg = "Handler is not initialized."
@@ -317,21 +328,21 @@ class MQTTClient:
     async def subscribe(self, topics: list[tuple[str, int]]) -> list[int]:
         """Subscribe to topics.
 
-        Send a MQTT `SUBSCRIBE <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718063>`_
+        Send a MQTT [SUBSCRIBE](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718063)
         message and wait for broker acknowledgment.
 
-        This method is a *coroutine*.
+        Args:
+            topics: array of tuples containing topic pattern and QOS from `amqtt.mqtt.constants` to subscribe. For example:
+                ```python
+                [
+                    ("$SYS/broker/uptime", QOS_1),
+                    ("$SYS/broker/load/#", QOS_2),
+                ]
+                ```
 
-        :param topics: array of topics pattern to subscribe with associated QoS.
-        :return: `SUBACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718068>`_ message return code.
+        Returns:
+            [SUBACK](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718068) message return code.
 
-        Example of ``topics`` argument expected structure:
-        ::
-
-            [
-                ("$SYS/broker/uptime", QOS_1),
-                ("$SYS/broker/load/#", QOS_2),
-            ]
         """
         if self._handler and self.session:
             return await self._handler.mqtt_subscribe(topics, self.session.next_packet_id)
@@ -341,18 +352,16 @@ class MQTTClient:
     async def unsubscribe(self, topics: list[str]) -> None:
         """Unsubscribe from topics.
 
-        Send a MQTT `UNSUBSCRIBE <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718072>`_
-        message and wait for broker `UNSUBACK <http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718077>`_
+        Send a MQTT [UNSUBSCRIBE](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718072)
+        message and wait for broker [UNSUBACK](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718077)
         message.
 
-        This method is a *coroutine*.
+        Args:
+            topics: array of topics to unsubscribe from.
+                ```
+                ["$SYS/broker/uptime", "$SYS/broker/load/#"]
+                ```
 
-        :param topics: array of topics to unsubscribe from.
-
-        Example of ``topics`` argument expected structure:
-        ::
-
-            ["$SYS/broker/uptime", "$SYS/broker/load/#"]
         """
         if self._handler and self.session:
             await self._handler.mqtt_unsubscribe(topics, self.session.next_packet_id)
@@ -363,12 +372,15 @@ class MQTTClient:
         Deliver next message received from the broker. If no message is available, this methods waits until next message arrives
         or ``timeout_duration`` occurs.
 
-        This method is a *coroutine*.
+        Args:
+            timeout_duration: maximum number of seconds to wait before returning. If not specified or None, there is no limit.
 
-        :param timeout_duration: maximum number of seconds to wait before returning.
-        If not specified or None, there is no limit.
-        :return: instance of :class:`amqtt.session.ApplicationMessage` containing received message information flow.
-        :raises: :class:`asyncio.TimeoutError` if timeout occurs before a message is delivered
+        Returns:
+            instance of `amqtt.session.ApplicationMessage` containing received message information flow.
+
+        Raises:
+            asyncio.TimeoutError: if timeout occurs before a message is delivered
+
         """
         if self._handler is None:
             msg = "Handler is not initialized."
@@ -461,6 +473,7 @@ class MQTTClient:
             reader: StreamReaderAdapter | WebSocketsReader | None = None
             writer: StreamWriterAdapter | WebSocketsWriter | None = None
             self._connected_state.clear()
+
             # Open connection
             if scheme in ("mqtt", "mqtts"):
                 conn_reader, conn_writer = await asyncio.open_connection(
@@ -468,6 +481,7 @@ class MQTTClient:
                     self.session.remote_port,
                     **kwargs,
                 )
+
                 reader = StreamReaderAdapter(conn_reader)
                 writer = StreamWriterAdapter(conn_writer)
             elif scheme in ("ws", "wss") and self.session.broker_uri:
@@ -479,11 +493,11 @@ class MQTTClient:
                 )
                 reader = WebSocketsReader(websocket)
                 writer = WebSocketsWriter(websocket)
-
-            if reader is None or writer is None:
-                self.session.transitions.disconnect()
-                self.logger.warning("reader or writer not initialized")
-                msg = "reader or writer not initialized"
+            elif not self.session.broker_uri:
+                msg = "missing broker uri"
+                raise ClientError(msg)
+            else:
+                msg = f"incorrect scheme defined in uri: '{scheme!r}'"
                 raise ClientError(msg)
 
             # Start MQTT protocol
@@ -504,7 +518,7 @@ class MQTTClient:
             self.logger.debug(f"Connected to {self.session.remote_address}:{self.session.remote_port}")
 
         except (InvalidURI, InvalidHandshake, ProtocolHandlerError, ConnectionError, OSError) as e:
-            self.logger.warning(f"Connection failed : {self.session.broker_uri} : {e}")
+            self.logger.debug(f"Connection failed : {self.session.broker_uri} [{e!r}]")
             self.session.transitions.disconnect()
             raise ConnectError(e) from e
         return return_code
@@ -523,7 +537,7 @@ class MQTTClient:
             while self.client_tasks:
                 task = self.client_tasks.popleft()
                 if not task.done():
-                    task.cancel()
+                    task.cancel(msg="Connection closed.")
 
         self.logger.debug("Monitoring broker disconnection")
         # Wait for disconnection from broker (like connection lost)
@@ -587,7 +601,7 @@ class MQTTClient:
             session.will_flag = True
             session.will_retain = self.config["will"]["retain"]
             session.will_topic = self.config["will"]["topic"]
-            session.will_message = self.config["will"]["message"]
+            session.will_message = self.config["will"]["message"].encode()
             session.will_qos = self.config["will"]["qos"]
 
         return session

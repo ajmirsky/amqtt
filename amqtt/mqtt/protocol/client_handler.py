@@ -1,7 +1,7 @@
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from amqtt.errors import AMQTTError
+from amqtt.errors import AMQTTError, NoDataError
 from amqtt.mqtt.connack import ConnackPacket
 from amqtt.mqtt.connect import ConnectPacket, ConnectPayload, ConnectVariableHeader
 from amqtt.mqtt.disconnect import DisconnectPacket
@@ -15,11 +15,13 @@ from amqtt.mqtt.unsubscribe import UnsubscribePacket
 from amqtt.plugins.manager import PluginManager
 from amqtt.session import Session
 
+if TYPE_CHECKING:
+    from amqtt.client import ClientContext
 
-class ClientProtocolHandler(ProtocolHandler):
+class ClientProtocolHandler(ProtocolHandler["ClientContext"]):
     def __init__(
         self,
-        plugins_manager: PluginManager,
+        plugins_manager: PluginManager["ClientContext"],
         session: Session | None = None,
         loop: asyncio.AbstractEventLoop | None = None,
     ) -> None:
@@ -87,8 +89,10 @@ class ClientProtocolHandler(ProtocolHandler):
         if self.reader is None:
             msg = "Reader is not initialized."
             raise AMQTTError(msg)
-
-        connack = await ConnackPacket.from_stream(self.reader)
+        try:
+            connack = await ConnackPacket.from_stream(self.reader)
+        except NoDataError as e:
+            raise ConnectionError from e
         await self.plugins_manager.fire_event(EVENT_MQTT_PACKET_RECEIVED, packet=connack, session=self.session)
         return connack.return_code
 
