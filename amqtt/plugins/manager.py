@@ -1,14 +1,16 @@
 __all__ = ["BaseContext", "PluginManager", "get_plugin_manager"]
 
 import asyncio
+from collections import defaultdict
 from collections.abc import Awaitable
 import contextlib
 import copy
 from importlib.metadata import EntryPoint, EntryPoints, entry_points
 import logging
-from typing import TYPE_CHECKING, Any, Generic, NamedTuple, Optional, TypeVar
+from inspect import iscoroutinefunction
+from typing import TYPE_CHECKING, Any, Generic, NamedTuple, Optional, TypeVar, Coroutine, Callable, TypeAlias
 
-from amqtt import Events
+from amqtt import Events, BrokerEvents
 from amqtt.errors import PluginImportError, PluginInitError
 from amqtt.session import Session
 
@@ -24,6 +26,9 @@ class Plugin(NamedTuple):
     name: str
     ep: EntryPoint
     object: Any
+
+
+AsyncFunc: TypeAlias = Callable[..., Coroutine[Any, Any, None]]
 
 
 plugins_manager: dict[str, "PluginManager[Any]"] = {}
@@ -68,6 +73,7 @@ class PluginManager(Generic[C]):
         self._plugins: list[BasePlugin[C]] = []
         self._auth_plugins: list[BaseAuthPlugin] = []
         self._topic_plugins: list[BaseTopicPlugin] = []
+        self._event_plugin_callbacks: dict[str, list[AsyncFunc]] = defaultdict(list)
         self._load_plugins(namespace)
         self._fired_events: list[asyncio.Future[Any]] = []
         plugins_manager[namespace] = self
@@ -103,6 +109,15 @@ class PluginManager(Generic[C]):
                     self._topic_plugins.append(plugin.object)
                 self.logger.debug(f" Plugin {item.name} ready")
 
+        for plugin in self._plugins:
+            for event in BrokerEvents:
+                if awaitable := getattr(plugin, f"on_{event}", None):
+                    if not iscoroutinefunction(awaitable):
+                        msg = f"'on_{event}' for '{plugin.__class__.__name__}' is not a coroutine'"
+                        raise PluginImportError(msg)
+                    self.logger.debug(f"'{event}' handler found for '{plugin.__class__.__name__}'")
+                    self._event_plugin_callbacks[event].append(awaitable)
+
     def _load_ep_plugin(self, ep: EntryPoint) -> Plugin | None:
         try:
             self.logger.debug(f" Loading plugin {ep!s}")
@@ -130,7 +145,6 @@ class PluginManager(Generic[C]):
         :return:
         """
         for p in self._plugins:
-            self.logger.debug(f"plugin name >>>> {p.__class__.__name__}")
             if p.__class__.__name__ == name:
                 return p
         return None
@@ -153,7 +167,8 @@ class PluginManager(Generic[C]):
     def _schedule_coro(self, coro: Awaitable[str | bool | None]) -> asyncio.Future[str | bool | None]:
         return asyncio.ensure_future(coro)
 
-    async def fire_event(self, event_name: Events, *args: Any, wait: bool = False, **kwargs: Any) -> None:
+
+    async def fire_event(self, event_name: Events, *, wait: bool = False, **method_kwargs: dict[str, Any]) -> None:
         """Fire an event to plugins.
 
         PluginManager schedules async calls for each plugin on method called "on_" + event_name.
@@ -161,27 +176,46 @@ class PluginManager(Generic[C]):
         Method calls are scheduled in the async loop. wait parameter must be set to true
         to wait until all methods are completed.
         :param event_name:
-        :param args:
-        :param kwargs:
-        :param wait: indicates if fire_event should wait for plugin calls completion (True), or not
+        :param method_kwargs: the parameters associated with the particular event
+        :param wait: indicate if fire_event should wait for plugin calls completion (True), or not
         :return:
         """
         tasks: list[asyncio.Future[Any]] = []
-        event_method_name = "on_" + event_name
-        for plugin in self._plugins:
-            event_method = getattr(plugin, event_method_name, None)
-            if event_method:
-                try:
-                    task = self._schedule_coro(event_method(*args, **kwargs))
-                    tasks.append(task)
 
-                    def clean_fired_events(future: asyncio.Future[Any]) -> None:
-                        with contextlib.suppress(KeyError, ValueError):
-                            self._fired_events.remove(future)
+        # check if any plugin has defined a callback for this event, skip if none
+        if event_name not in self._event_plugin_callbacks:
+            return
 
-                    task.add_done_callback(clean_fired_events)
-                except AssertionError:
-                    self.logger.exception(f"Method '{event_method_name}' on plugin '{plugin.__class__}' is not a coroutine")
+        for event_method in self._event_plugin_callbacks[event_name]:
+
+            try:
+                task = self._schedule_coro(event_method(**method_kwargs))
+                tasks.append(task)
+
+                def clean_fired_events(future: asyncio.Future[Any]) -> None:
+                    with contextlib.suppress(KeyError, ValueError):
+                        self._fired_events.remove(future)
+
+                task.add_done_callback(clean_fired_events)
+            except AssertionError:
+                self.logger.exception(
+                    f"Method '{event_method}' is not a coroutine")
+
+
+
+        # for event_awaitable in self._event_plugin_callbacks[event_name]:
+        #
+        #     async def call_method(method: AsyncFunc, kwargs: dict[str, Any]) -> Any:
+        #         return await method(**kwargs)
+        #
+        #     coro_instance: Awaitable[Any] = call_method(event_awaitable, method_kwargs)
+        #     tasks.append(asyncio.ensure_future(coro_instance))
+        #
+        #     def clean_fired_events(future: asyncio.Future[Any]) -> None:
+        #         with contextlib.suppress(KeyError, ValueError):
+        #             self._fired_events.remove(future)
+        #
+        #     tasks[-1].add_done_callback(clean_fired_events)
 
         self._fired_events.extend(tasks)
         if wait and tasks:

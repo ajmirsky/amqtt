@@ -2,6 +2,7 @@ import asyncio
 import logging
 import unittest
 
+from amqtt import BrokerEvents
 from amqtt.broker import Action
 from amqtt.plugins.authentication import BaseAuthPlugin
 from amqtt.plugins.manager import BaseContext, PluginManager
@@ -25,7 +26,7 @@ class EventTestPlugin(BaseAuthPlugin, BaseTopicPlugin):
         self.test_topic_flag = False
         self.test_event_flag = False
 
-    async def on_test(self) -> None:
+    async def on_broker_post_start(self) -> None:
         self.test_event_flag = True
 
     async def authenticate(self, *, session: Session) -> bool | None:
@@ -52,7 +53,7 @@ class TestPluginManager(unittest.TestCase):
 
     def test_fire_event(self) -> None:
         async def fire_event() -> None:
-            await manager.fire_event("test")
+            await manager.fire_event(BrokerEvents.POST_START)
             await asyncio.sleep(1)
             await manager.close()
 
@@ -64,7 +65,7 @@ class TestPluginManager(unittest.TestCase):
 
     def test_fire_event_wait(self) -> None:
         async def fire_event() -> None:
-            await manager.fire_event("test", wait=True)
+            await manager.fire_event(BrokerEvents.POST_START, wait=True)
             await manager.close()
 
         manager = PluginManager("amqtt.test.plugins", context=None)

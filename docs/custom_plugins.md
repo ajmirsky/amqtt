@@ -28,17 +28,21 @@ its own variables to configure its behavior.
 Plugins that are defined in the`project.entry-points` are notified of events if the subclass 
 implements one or more of these methods:
 
-- `on_mqtt_packet_sent`
-- `on_mqtt_packet_received`
-- `on_broker_pre_start`
-- `on_broker_post_start`
-- `on_broker_pre_shutdown`
-- `on_broker_post_shutdown`
-- `on_broker_client_connected`
-- `on_broker_client_disconnected`
-- `on_broker_client_subscribed`
-- `on_broker_client_unsubscribed`
-- `on_broker_message_received`
+- `async def on_mqtt_packet_sent(packet: MQTTPacket[PacketIdVariableHeader, SubscribePayload, MQTTFixedHeader]) -> None`
+- `async def on_mqtt_packet_received(packet: MQTTPacket[PacketIdVariableHeader, SubscribePayload, MQTTFixedHeader]) -> None`
+
+- `async def on_broker_pre_start() -> None`
+- `async def on_broker_post_start() -> None`
+- `async def on_broker_pre_shutdown() -> None`
+- `async def on_broker_post_shutdown() -> None`
+
+- `async def on_broker_client_connected(client_id:str) -> None`
+- `async def on_broker_client_disconnected(client_id:str) -> None`
+
+- `async def on_broker_client_subscribed(client_id: str, topic: str, qos: int) -> None`
+- `async def on_broker_client_unsubscribed(client_id: str, topic: str) -> None`
+
+- `async def on_broker_message_received(client_id: str, message: ApplicationMessage) -> None`
 
 
 ## Authentication Plugins
