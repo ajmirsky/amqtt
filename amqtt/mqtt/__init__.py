@@ -1,4 +1,5 @@
 """INIT."""
+__all__ = ["MQTTPacket"]
 
 from typing import Any, TypeAlias
 

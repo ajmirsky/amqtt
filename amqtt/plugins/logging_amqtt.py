@@ -1,13 +1,13 @@
 from collections.abc import Callable, Coroutine
 from functools import partial
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from amqtt.mqtt import MQTTPacket
+from amqtt.mqtt.packet import MQTTFixedHeader, MQTTPayload, MQTTVariableHeader
 from amqtt.plugins.base import BasePlugin
 from amqtt.plugins.manager import BaseContext
-
-if TYPE_CHECKING:
-    from amqtt.session import Session
+from amqtt.session import Session
 
 
 class EventLoggerPlugin(BasePlugin[BaseContext]):
@@ -29,20 +29,20 @@ class EventLoggerPlugin(BasePlugin[BaseContext]):
 class PacketLoggerPlugin(BasePlugin[BaseContext]):
     """A plugin to log MQTT packets sent and received."""
 
-    async def on_mqtt_packet_received(self, *args: Any, **kwargs: Any) -> None:
+    async def on_mqtt_packet_received(self, *,
+                                      packet: MQTTPacket[MQTTVariableHeader, MQTTPayload[MQTTVariableHeader], MQTTFixedHeader],
+                                      session: Session | None) -> None:
         """Log an MQTT packet when it is received."""
-        packet = kwargs.get("packet")
-        session: Session | None = kwargs.get("session")
         if self.context.logger.isEnabledFor(logging.DEBUG):
             if session is not None:
                 self.context.logger.debug(f"{session.client_id} <-in-- {packet!r}")
             else:
                 self.context.logger.debug(f"<-in-- {packet!r}")
 
-    async def on_mqtt_packet_sent(self, *args: Any, **kwargs: Any) -> None:
+    async def on_mqtt_packet_sent(self, *,
+                                  packet: MQTTPacket[MQTTVariableHeader, MQTTPayload[MQTTVariableHeader], MQTTFixedHeader],
+                                  session: Session | None) -> None:
         """Log an MQTT packet when it is sent."""
-        packet = kwargs.get("packet")
-        session: Session | None = kwargs.get("session")
         if self.context.logger.isEnabledFor(logging.DEBUG):
             if session is not None:
                 self.context.logger.debug(f"{session.client_id} -out-> {packet!r}")

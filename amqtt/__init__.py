@@ -8,8 +8,14 @@ from enum import StrEnum
 class Events(StrEnum):
     """Class for all events."""
 
+
 class ClientEvents(Events):
     """Events issued by the client."""
+
+
+class MQTTEvents(Events):
+    PACKET_SENT = "mqtt_packet_sent"
+    PACKET_RECEIVED = "mqtt_packet_received"
 
 
 class BrokerEvents(Events):
