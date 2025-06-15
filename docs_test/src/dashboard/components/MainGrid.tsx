@@ -28,7 +28,7 @@ export default function MainGrid() {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
-function secondsToDhms(seconds: int) {
+function secondsToDhms(seconds: number) {
   const days = Math.floor(seconds / (24 * 3600));
   seconds %= (24 * 3600);
   const hours = Math.floor(seconds / 3600);
@@ -215,10 +215,8 @@ function secondsToDhms(seconds: int) {
         columns={12}
         sx={{mb: (theme) => theme.spacing(2)}}
       ><Grid size={{xs: 12, md: 12}}>
-
-
-        <strong>broker started at </strong> {serverStart} &nbsp;&nbsp;&nbsp;&nbsp;
-          <strong>up for</strong> {serverUptime}
+        { isConnected && sent.length > 0 ? <><strong>broker started at </strong> {serverStart} &nbsp;&nbsp;&nbsp;&nbsp;
+          <strong>up for</strong> {serverUptime}</> : <></> }
         </Grid>
         <Grid size={{xs: 12, md: 6}}>
           <SessionsChart title={'Sent Messages'} label={'Messages'} data={sent} isConnected={isConnected}/>

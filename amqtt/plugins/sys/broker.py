@@ -1,8 +1,10 @@
 import asyncio
+import logging
 from collections import deque  # pylint: disable=C0412
 from typing import SupportsIndex, SupportsInt  # pylint: disable=C0412
 
 from amqtt.plugins.base import BasePlugin
+from amqtt.session import Session
 
 try:
     from collections.abc import Buffer
@@ -26,7 +28,8 @@ except ImportError:
 import amqtt
 from amqtt.broker import BrokerContext
 from amqtt.codecs_amqtt import int_to_bytes_str
-from amqtt.mqtt.packet import PUBLISH, MQTTFixedHeader, MQTTPacket, PacketIdVariableHeader
+from amqtt.mqtt.packet import PUBLISH, MQTTFixedHeader, MQTTPacket, PacketIdVariableHeader, MQTTVariableHeader, \
+    MQTTPayload
 from amqtt.mqtt.subscribe import SubscribePayload
 
 DOLLAR_SYS_ROOT = "$SYS/broker/"
@@ -41,6 +44,8 @@ STAT_CLIENTS_MAXIMUM = "clients_maximum"
 STAT_CLIENTS_CONNECTED = "clients_connected"
 STAT_CLIENTS_DISCONNECTED = "clients_disconnected"
 
+
+logger = logging.getLogger(__name__)
 
 class BrokerSysPlugin(BasePlugin[BrokerContext]):
     def __init__(self, context: BrokerContext) -> None:
@@ -170,13 +175,11 @@ class BrokerSysPlugin(BasePlugin[BrokerContext]):
             else None
         )
 
-    async def on_mqtt_packet_received(
-        self,
-        *args: None,
-        **kwargs: MQTTPacket[PacketIdVariableHeader, SubscribePayload, MQTTFixedHeader],
-    ) -> None:
+    async def on_mqtt_packet_received(self, *,
+                                      packet: MQTTPacket[MQTTVariableHeader, MQTTPayload[MQTTVariableHeader], MQTTFixedHeader],
+                                      session: Session | None = None
+                                      ) -> None:
         """Handle incoming MQTT packets."""
-        packet = kwargs.get("packet")
         if packet:
             packet_size = packet.bytes_length
             self._stats[STAT_BYTES_RECEIVED] += packet_size
@@ -184,13 +187,11 @@ class BrokerSysPlugin(BasePlugin[BrokerContext]):
             if packet.fixed_header.packet_type == PUBLISH:
                 self._stats[STAT_PUBLISH_RECEIVED] += 1
 
-    async def on_mqtt_packet_sent(
-        self,
-        *args: None,
-        **kwargs: MQTTPacket[PacketIdVariableHeader, SubscribePayload, MQTTFixedHeader],
+    async def on_mqtt_packet_sent(self, *,
+                                  packet: MQTTPacket[MQTTVariableHeader, MQTTPayload[MQTTVariableHeader], MQTTFixedHeader],
+                                  session: Session | None = None
     ) -> None:
         """Handle sent MQTT packets."""
-        packet = kwargs.get("packet")
         if packet:
             packet_size = packet.bytes_length
             self._stats[STAT_BYTES_SENT] += packet_size

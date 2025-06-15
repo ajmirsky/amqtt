@@ -3,6 +3,8 @@ from functools import partial
 import logging
 from typing import TYPE_CHECKING, Any
 
+from amqtt.mqtt import MQTTPacket
+from amqtt.mqtt.packet import MQTTVariableHeader, MQTTPayload, MQTTFixedHeader
 from amqtt.plugins.base import BasePlugin
 from amqtt.plugins.manager import BaseContext
 
@@ -28,7 +30,9 @@ class EventLoggerPlugin(BasePlugin[BaseContext]):
 class PacketLoggerPlugin(BasePlugin[BaseContext]):
     """A plugin to log MQTT packets sent and received."""
 
-    async def on_mqtt_packet_received(self, *, packet: Any, session: Session | None) -> None:
+    async def on_mqtt_packet_received(self, *,
+                                      packet: MQTTPacket[MQTTVariableHeader, MQTTPayload[MQTTVariableHeader], MQTTFixedHeader],
+                                      session: Session | None) -> None:
         """Log an MQTT packet when it is received."""
         if self.context.logger.isEnabledFor(logging.DEBUG):
             if session is not None:
@@ -36,10 +40,10 @@ class PacketLoggerPlugin(BasePlugin[BaseContext]):
             else:
                 self.context.logger.debug(f"<-in-- {packet!r}")
 
-    async def on_mqtt_packet_sent(self, *args: Any, **kwargs: Any) -> None:
+    async def on_mqtt_packet_sent(self, *,
+                                  packet: MQTTPacket[MQTTVariableHeader, MQTTPayload[MQTTVariableHeader], MQTTFixedHeader],
+                                  session: Session | None) -> None:
         """Log an MQTT packet when it is sent."""
-        packet = kwargs.get("packet")
-        session: Session | None = kwargs.get("session")
         if self.context.logger.isEnabledFor(logging.DEBUG):
             if session is not None:
                 self.context.logger.debug(f"{session.client_id} -out-> {packet!r}")

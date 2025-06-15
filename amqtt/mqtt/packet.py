@@ -9,7 +9,7 @@ except ImportError:
     UTC = timezone.utc
 
 from struct import unpack
-from typing import Generic
+from typing import Generic, TypeAlias
 from typing_extensions import Self, TypeVar
 
 from amqtt.adapters import ReaderAdapter, WriterAdapter
@@ -199,7 +199,7 @@ class MQTTPacket(Generic[_VH, _P, _FH]):
 
     VARIABLE_HEADER: type[_VH] | None = None
     PAYLOAD: type[_P] | None = None
-    FIXED_HEADER: type[_FH] = MQTTFixedHeader  # type: ignore [assignment]
+    FIXED_HEADER: type[_FH] = MQTTFixedHeader
 
     def __init__(self, fixed: _FH, variable_header: _VH | None = None, payload: _P | None = None) -> None:
         self.fixed_header = fixed
