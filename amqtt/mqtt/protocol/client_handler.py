@@ -1,8 +1,8 @@
 import asyncio
 from typing import TYPE_CHECKING, Any
 
-from amqtt import MQTTEvents
 from amqtt.errors import AMQTTError, NoDataError
+from amqtt.events import MQTTEvents
 from amqtt.mqtt.connack import ConnackPacket
 from amqtt.mqtt.connect import ConnectPacket, ConnectPayload, ConnectVariableHeader
 from amqtt.mqtt.disconnect import DisconnectPacket

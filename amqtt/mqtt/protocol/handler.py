@@ -19,9 +19,9 @@ import itertools
 import logging
 from typing import Generic, TypeVar, cast
 
-from amqtt import MQTTEvents
 from amqtt.adapters import ReaderAdapter, WriterAdapter
 from amqtt.errors import AMQTTError, MQTTError, NoDataError, ProtocolHandlerError
+from amqtt.events import MQTTEvents
 from amqtt.mqtt import packet_class
 from amqtt.mqtt.connack import ConnackPacket
 from amqtt.mqtt.connect import ConnectPacket

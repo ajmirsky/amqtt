@@ -2,9 +2,9 @@ import asyncio
 from asyncio import AbstractEventLoop, Queue
 from typing import TYPE_CHECKING
 
-from amqtt import MQTTEvents
 from amqtt.adapters import ReaderAdapter, WriterAdapter
 from amqtt.errors import MQTTError
+from amqtt.events import MQTTEvents
 from amqtt.mqtt.connack import (
     BAD_USERNAME_PASSWORD,
     CONNECTION_ACCEPTED,
