@@ -7,10 +7,12 @@ import contextlib
 import copy
 from importlib.metadata import EntryPoint, EntryPoints, entry_points
 import logging
+
 from inspect import iscoroutinefunction
 from typing import TYPE_CHECKING, Any, Generic, NamedTuple, Optional, TypeVar, Coroutine, Callable, TypeAlias
 
 from amqtt import Events, BrokerEvents
+
 from amqtt.errors import PluginImportError, PluginInitError
 from amqtt.session import Session
 
