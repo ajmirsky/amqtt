@@ -7,6 +7,7 @@ import { LineChart } from '@mui/x-charts/LineChart';
 import CountUp from 'react-countup';
 import type { DataPoint } from '../../assets/helpers.jsx';
 import {CircularProgress} from "@mui/material";
+import {ByteCounter} from "./Counter.tsx";
 
 const currentTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -131,10 +132,8 @@ export default function SessionsChart(props: any) {
             <Typography variant="h4" component="p">
 
               { props.data.length < 2 ? "" :
-              <CountUp
-                start={props.data[props.data.length - 2].value}
-                end={props.data[props.data.length - 1].value}
-                duration={5}/>}
+                <props.counter start={props.data[props.data.length - 2].value} end={props.data[props.data.length - 1].value} />
+              }
             </Typography>
           </Stack>
         </Stack>

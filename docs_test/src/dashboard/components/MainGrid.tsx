@@ -13,6 +13,7 @@ import {FontAwesomeIcon} from '@fortawesome/react-fontawesome'
 import {faGithub, faPython, faDocker, faDiscord} from "@fortawesome/free-brands-svg-icons";
 
 import rtdIcon from "../../assets/readthedocs.svg";
+import {ByteCounter, StandardCounter} from "./Counter.tsx";
 
 export default function MainGrid() {
 
@@ -226,16 +227,16 @@ export default function MainGrid() {
         <strong>up for</strong> {serverUptime}
       </Grid>
         <Grid size={{xs: 12, md: 6}}>
-          <SessionsChart title={'Sent Messages'} label={'Messages'} data={sent} isConnected={isConnected}/>
+          <SessionsChart title={'Sent Messages'} label={'Messages'} data={sent} isConnected={isConnected} counter={StandardCounter}/>
         </Grid>
         <Grid size={{xs: 12, md: 6}}>
-          <SessionsChart title={'Received Messages'} label={'Messages'} data={received} isConnected={isConnected}/>
+          <SessionsChart title={'Received Messages'} label={'Messages'} data={received} isConnected={isConnected} counter={StandardCounter}/>
         </Grid>
         <Grid size={{xs: 12, md: 6}}>
-          <SessionsChart title={'Bytes Out'} label={'Bytes'} data={bytesOut} isConnected={isConnected}/>
+          <SessionsChart title={'Bytes Out'} label={'Bytes'} data={bytesOut} isConnected={isConnected} counter={ByteCounter}/>
         </Grid>
         <Grid size={{xs: 12, md: 6}}>
-          <SessionsChart title={'Bytes In'} label={'Bytes'} data={bytesIn} isConnected={isConnected}/>
+          <SessionsChart title={'Bytes In'} label={'Bytes'} data={bytesIn} isConnected={isConnected} counter={ByteCounter}/>
         </Grid>
       </Grid>
 
