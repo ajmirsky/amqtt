@@ -31,10 +31,10 @@ implements one or more of these methods:
 - `async def on_mqtt_packet_sent(self, packet: MQTTPacket[MQTTVariableHeader, MQTTPayload[MQTTVariableHeader], MQTTFixedHeader], session: Session | None = None) -> None`
 - `async def on_mqtt_packet_received(self, packet: MQTTPacket[MQTTVariableHeader, MQTTPayload[MQTTVariableHeader], MQTTFixedHeader], session: Session | None = None) -> None`
 
-- `async def on_broker_pre_start() -> None`
-- `async def on_broker_post_start() -> None`
-- `async def on_broker_pre_shutdown() -> None`
-- `async def on_broker_post_shutdown() -> None`
+- `async def on_broker_pre_start(self) -> None`
+- `async def on_broker_post_start(self) -> None`
+- `async def on_broker_pre_shutdown(self) -> None`
+- `async def on_broker_post_shutdown(self) -> None`
 
 - `async def on_broker_client_connected(self, client_id:str, client_session:Session) -> None`
 - `async def on_broker_client_disconnected(self, client_id:str, client_session:Session) -> None`

@@ -6,13 +6,16 @@ from collections.abc import Awaitable, Callable, Coroutine
 import contextlib
 import copy
 from importlib.metadata import EntryPoint, EntryPoints, entry_points
+import inspect
 from inspect import iscoroutinefunction
 import logging
 from typing import TYPE_CHECKING, Any, Generic, NamedTuple, Optional, TypeAlias, TypeVar
 
 from amqtt.errors import PluginImportError, PluginInitError
 from amqtt.events import BrokerEvents, Events, MQTTEvents
-from amqtt.session import Session
+from amqtt.mqtt import MQTTPacket
+from amqtt.mqtt.packet import MQTTFixedHeader, MQTTPayload, MQTTVariableHeader
+from amqtt.session import ApplicationMessage, Session
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,6 +28,44 @@ class Plugin(NamedTuple):
     name: str
     ep: EntryPoint
     object: Any
+
+
+class EventSignaturePlugin(BasePlugin):
+    async def on_mqtt_packet_sent(self,
+                                  packet: MQTTPacket[MQTTVariableHeader, MQTTPayload[MQTTVariableHeader], MQTTFixedHeader],
+                                  session: Session | None = None) -> None:
+        pass
+
+    async def on_mqtt_packet_received(self, packet: MQTTPacket[MQTTVariableHeader, MQTTPayload[MQTTVariableHeader], MQTTFixedHeader],
+                                      session: Session | None = None) -> None:
+        pass
+
+    async def on_broker_pre_start(self) -> None:
+        pass
+
+    async def on_broker_post_start(self) -> None:
+        pass
+
+    async def on_broker_pre_shutdown(self) -> None:
+        pass
+
+    async def on_broker_post_shutdown(self) -> None:
+        pass
+
+    async def on_broker_client_connected(self, client_id: str, client_session: Session) -> None:
+        pass
+
+    async def on_broker_client_disconnected(self, client_id: str, client_session: Session) -> None:
+        pass
+
+    async def on_broker_client_subscribed(self, client_id: str, topic: str, qos: int) -> None:
+        pass
+
+    async def on_broker_client_unsubscribed(self, client_id: str, topic: str) -> None:
+        pass
+
+    async def on_broker_message_received(self, client_id: str, message: ApplicationMessage) -> None:
+        pass
 
 
 plugins_manager: dict[str, "PluginManager[Any]"] = {}
@@ -113,6 +154,18 @@ class PluginManager(Generic[C]):
                     if not iscoroutinefunction(awaitable):
                         msg = f"'on_{event}' for '{plugin.__class__.__name__}' is not a coroutine'"
                         raise PluginImportError(msg)
+
+                    std_sig = inspect.signature(getattr(EventSignaturePlugin, f"on_{event}"))
+                    plugin_sig = inspect.signature(awaitable)
+                    for name, param in std_sig.parameters.items():
+                        print(f"{name} >> {param}")
+
+                    for name, param in plugin_sig.parameters.items():
+                        print(f"{name} >> {param}")
+
+
+
+
                     self.logger.debug(f"'{event}' handler found for '{plugin.__class__.__name__}'")
                     self._event_plugin_callbacks[event].append(awaitable)
 
