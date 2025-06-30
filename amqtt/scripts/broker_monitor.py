@@ -23,9 +23,16 @@ config: dict[str, Any] = {
             "bind": "0.0.0.0:1883",
         },
         "ws-mqtt": {
-            "bind": "127.0.0.1:8080",
             "type": "ws",
-            "max_connections": 20,
+            "bind": "0.0.0.0:8080",
+        },
+        "tls-mqtt": {
+            "type": "tcp",
+            "bind": "0.0.0.0:8883",
+            "ssl": True,
+            "cafile": "/app/cert/live/test.amqtt.io/fullchain.pem",
+            "certfile": "/app/cert/live/test.amqtt.io/fullchain.pem",
+            "keyfile": "/app/cert/live/test.amqtt.io/privkey.pem"
         },
     },
     "sys_interval": 2
