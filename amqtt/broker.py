@@ -11,6 +11,7 @@ import re
 import ssl
 from typing import Any, ClassVar, TypeAlias
 
+import newrelic.agent
 from transitions import Machine, MachineError
 import websockets.asyncio.server
 from websockets.asyncio.server import ServerConnection
@@ -222,6 +223,7 @@ class Broker:
     def _log_state_change(self) -> None:
         self.logger.debug(f"State transition: {self.transitions.state}")
 
+    @newrelic.agent.background_task()
     async def start(self) -> None:
         """Start the broker to serve with the given configuration.
 
@@ -252,6 +254,7 @@ class Broker:
             msg = f"Broker instance can't be started: {e}"
             raise BrokerError(msg) from e
 
+    @newrelic.agent.background_task()
     async def _start_listeners(self) -> None:
         """Start network listeners based on the configuration."""
         for listener_name, listener in self.listeners_config.items():
@@ -292,6 +295,7 @@ class Broker:
             raise BrokerError(msg) from fnfe
         return ssl_context
 
+    @newrelic.agent.background_task()
     async def _create_server_instance(
         self,
         listener_name: str,
@@ -366,9 +370,11 @@ class Broker:
     async def internal_message_broadcast(self, topic: str, data: bytes, qos: int | None = None) -> None:
         return await self._broadcast_message(None, topic, data, qos)
 
+    @newrelic.agent.background_task()
     async def ws_connected(self, websocket: ServerConnection, listener_name: str) -> None:
         await self._client_connected(listener_name, WebSocketsReader(websocket), WebSocketsWriter(websocket))
 
+    @newrelic.agent.background_task()
     async def stream_connected(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, listener_name: str) -> None:
         await self._client_connected(listener_name, StreamReaderAdapter(reader), StreamWriterAdapter(writer))
 
@@ -500,6 +506,7 @@ class Broker:
 
         await self._client_message_loop(client_session, handler)
 
+    @newrelic.agent.background_task()
     async def _client_message_loop(self, client_session: Session, handler: BrokerProtocolHandler) -> None:
         """Run the main loop to handle client messages."""
         # Init and start loop for handling client messages (publish, subscribe/unsubscribe, disconnect)
@@ -596,7 +603,7 @@ class Broker:
         client_session.transitions.disconnect()
         await self.plugins_manager.fire_event(BrokerEvents.CLIENT_DISCONNECTED, client_id=client_session.client_id)
 
-
+    @newrelic.agent.background_task()
     async def _handle_subscription(
         self,
         client_session: Session,
@@ -618,6 +625,7 @@ class Broker:
                 )
                 await self._publish_retained_messages_for_subscription(subscription, client_session)
 
+    @newrelic.agent.background_task()
     async def _handle_unsubscription(
         self,
         client_session: Session,
@@ -636,6 +644,7 @@ class Broker:
             )
         await handler.mqtt_acknowledge_unsubscription(unsubscription.packet_id)
 
+    @newrelic.agent.background_task()
     async def _handle_message_delivery(
         self,
         client_session: Session,

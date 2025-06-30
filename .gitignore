@@ -34,3 +34,4 @@ site/
 _build/
 .hypothesis/
 coverage.xml
+newrelic.ini

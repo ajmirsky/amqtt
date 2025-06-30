@@ -7,7 +7,9 @@ RUN pip install uv
 WORKDIR /app
 
 COPY . /app
+RUN apk add gcc python3-dev musl-dev linux-headers
 RUN uv pip install --target=/deps .
+RUN uv pip install --target=/deps newrelic
 
 
 # -- final image, copy dependencies and amqtt source
