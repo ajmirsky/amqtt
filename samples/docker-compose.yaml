@@ -1,14 +1,12 @@
 services:
   amqtt:
     image: amqtt
-    command: ["python", "amqtt/scripts/broker_monitor.py"]
     environment:
       - NEWRELIC_CONFIG_INI=/app/conf/newrelic.ini
     container_name: amqtt
     ports:
       - "1883:1883"
       - "8080:8080"
-      - "8443:8443"
       - "8883:8883"
     logging:
       driver: "json-file"
@@ -16,6 +14,5 @@ services:
         max-size: "10m"
         max-file: "3"
     volumes:
-      - ./broker.yaml:/app/conf/broker.yaml
       - ./newrelic.ini:/app/conf/newrelic.ini
       - /etc/letsencrypt:/app/cert:ro

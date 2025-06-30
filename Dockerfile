@@ -20,10 +20,11 @@ WORKDIR /app
 COPY --from=build /deps /usr/local/lib/python3.13/site-packages/
 
 COPY ./amqtt/scripts/default_broker.yaml /app/conf/broker.yaml
+COPY ./amqtt/scripts/broker_monitor.py /app/broker_monitor.py
 
 EXPOSE 1883
 
 ENV PATH="/usr/local/lib/python3.13/site-packages/bin:$PATH"
 
-# Run `amqtt` when the container launches
-CMD ["amqtt", "-c", "/app/conf/broker.yaml"]
+
+CMD ["python", "/app/broker_monitor.py"]
