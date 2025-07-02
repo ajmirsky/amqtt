@@ -9,7 +9,7 @@ from amqtt.mqtt.constants import QOS_0
 
 async def run_client() -> None:
     client = MQTTClient()
-    await client.connect("mqtt://test.amqtt.io:1883/")
+    await client.connect("mqtt://localhost:1883/")
     await client.subscribe([
         ('$SYS/#', QOS_0),
         ('a/b', QOS_0),
@@ -39,7 +39,7 @@ async def main() -> None:
     while True:
         print("launching new client")
         asyncio.ensure_future(run_client())
-        await asyncio.sleep(randint(5,10))
+        await asyncio.sleep(0.25)
 
 
 if __name__ == "__main__":
