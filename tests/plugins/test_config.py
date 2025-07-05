@@ -1,7 +1,9 @@
 import asyncio
 import logging
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any
+from dacite import from_dict as dacite_load
 
 import pytest
 import yaml
@@ -11,6 +13,7 @@ from yaml import CLoader as Loader
 from dacite import from_dict, Config, UnexpectedDataError
 
 from amqtt.client import MQTTClient
+from amqtt.contexts import BrokerConfig
 from amqtt.errors import PluginLoadError, ConnectError, PluginCoroError
 from amqtt.mqtt.constants import QOS_0
 
@@ -219,3 +222,11 @@ async def test_block_topic_plugin_load():
     await client1.disconnect()
 
     await broker.shutdown()
+
+
+async def test_config_dataclass():
+
+    cfg: dict[str, Any] = yaml.safe_load(plugin_invalid_config_one)
+    broker_config = dacite_load(data_class=BrokerConfig, data=cfg, config=Config(cast=[StrEnum]))
+
+
