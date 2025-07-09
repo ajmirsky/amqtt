@@ -80,6 +80,9 @@ docs = [
 
 [project.optional-dependencies]
 ci = ["coveralls==4.0.1"]
+contrib = [
+    "cryptography>=45.0.3",
+]
 
 
 
