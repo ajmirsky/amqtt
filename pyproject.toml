@@ -41,6 +41,7 @@ dependencies = [
 dev = [
   "hatch>=1.14.1",
   "hypothesis>=6.130.8",
+  "lorem-text>=3.0",
   "mypy>=1.15.0",
   "paho-mqtt>=2.1.0",
   "poethepoet>=0.34.0",

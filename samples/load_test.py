@@ -12,7 +12,7 @@ async def run_client() -> None:
     client = MQTTClient()
     await client.connect("mqtt://localhost:1883/")
     await client.subscribe([
-        ('$SYS/#', QOS_0),
+        # ('$SYS/#', QOS_0),
         ('a/b', QOS_0),
     ])
     try:
@@ -46,7 +46,7 @@ async def main() -> None:
         while True:
             print("launching new client")
             tasks.append(asyncio.create_task(run_client()))
-            await asyncio.sleep(0.25)
+            await asyncio.sleep(0.5)
     except KeyboardInterrupt:
         for task in tasks:
             if not task.done():

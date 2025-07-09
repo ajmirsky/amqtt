@@ -21,7 +21,7 @@ LOGGING_CONFIG = {
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'level': 'DEBUG',
+            'level': 'INFO',
             'formatter': 'default',
             'stream': 'ext://sys.stdout',
         },
@@ -36,7 +36,7 @@ LOGGING_CONFIG = {
     },
 
     'root': {
-        'handlers': ['file'],
+        'handlers': ['file', 'console'],
         'level': 'DEBUG',
     },
 
@@ -72,7 +72,10 @@ config: dict[str, Any] = {
         #     "keyfile": "/app/cert/live/test.amqtt.io/privkey.pem"
         # },
     },
-    "sys_interval": 2
+    "plugins": {
+        'amqtt.plugins.sys.broker.BrokerSysPlugin': {'sys_interval': 2},
+        'amqtt.plugins.authentication.AnonymousAuthPlugin': {'allow_anonymous': True}
+    }
 }
 
 async def main_loop() -> None:
