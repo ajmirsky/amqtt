@@ -7,7 +7,7 @@
   import CountUp from 'react-countup';
   import type { DataPoint } from '../../assets/helpers.jsx';
   import {CircularProgress} from "@mui/material";
-  import {useRef, useState} from "react";
+  import {useRef} from "react";
 
   const currentTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -117,8 +117,8 @@
   }
 
   export default function SessionsChart(props: any) {
-    const lastCalc = useRef<number>(0);
 
+    const lastCalc = useRef<number>(0);
 
     const calc_per_second = (curValue: DataPoint, lastValue: DataPoint) => {
       if(!props.isPerSecond) { return ''; }
@@ -134,9 +134,6 @@
 
       return `${lastCalc.current} / sec`;
     }
-
-
-
 
     return (
       <Card variant="outlined" sx={{ width: '100%' }}>
