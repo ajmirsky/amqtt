@@ -106,7 +106,7 @@ def list_clients(ctx: typer.Context) -> None:
         connect = db_connection_str(ctx.obj["type"], ctx.obj["username"], ctx.obj["host"], ctx.obj["port"], ctx.obj["filename"])
         mgr = UserManager(connect)
         user_count = 0
-        for user in await mgr.list_users():
+        for user in await mgr.list_user_auths():
             user_count += 1
             logger.info(user)
 
@@ -131,7 +131,7 @@ def create_client(
             logger.error("Client password cannot be empty.")
             raise typer.Exit(1)
         try:
-            user = await mgr.create_user(client_id, client_password)
+            user = await mgr.create_user_auth(client_id, client_password)
         except passlib.exc.MissingBackendError as mbe:
             logger.critical(f"Please install backend: {mbe}")
             raise typer.Exit(code=1) from mbe
@@ -153,7 +153,7 @@ def remove_username(ctx: typer.Context,
         connect = db_connection_str(ctx.obj["type"], ctx.obj["username"], ctx.obj["host"], ctx.obj["port"],
                                     ctx.obj["filename"])
         mgr = UserManager(connect)
-        user = await mgr.delete_user(client_id)
+        user = await mgr.delete_user_auth(client_id)
         if not user:
             logger.error(f"User '{client_id}' not found.")
             raise typer.Exit(1)
@@ -179,7 +179,7 @@ def change_password(
         connect = db_connection_str(ctx.obj["type"], ctx.obj["username"], ctx.obj["host"], ctx.obj["port"],
                                     ctx.obj["filename"])
         mgr = UserManager(connect)
-        await mgr.update_password(client_id, client_password)
+        await mgr.update_user_auth_password(client_id, client_password)
 
     asyncio.run(run_password())
 
