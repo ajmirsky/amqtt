@@ -248,7 +248,7 @@ plugins:
 
 `amqtt.plugins.logging_amqtt.PacketLoggerPlugin`
 
-This plugin issues debug-level messages for [mqtt events](custom_plugins.md#client-and-broker): `on_mqtt_packet_sent`
+This plugin issues debug-level messages for [mqtt events](custom_plugins.md#events): `on_mqtt_packet_sent`
 and `on_mqtt_packet_received`.
 
 ```yaml
