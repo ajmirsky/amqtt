@@ -95,8 +95,8 @@ class LDAPTopicPlugin(BaseTopicPlugin):
     async def topic_filtering(
         self, *, session: Session | None = None, topic: str | None = None, action: Action | None = None
     ) -> bool | None:
-        # search_filter = f"({self.config.user_attribute}={session.username})"
-        search_filter = "(uid=jdoe)"
+
+        search_filter = f"({self.config.user_attribute}={session.username})"
         attrs = [
             "cn",
             self.config.publish_attribute,
@@ -118,13 +118,10 @@ class LDAPTopicPlugin(BaseTopicPlugin):
         dn, entry = results[0]
 
         ldap_attribute = getattr(self.config, self._action_attr_map[action])
-        allowed_topics = [t.decode("utf-8") for t in entry.get(ldap_attribute, [])]
-        logger.debug(f"DN: {dn} - {ldap_attribute}={allowed_topics}")
+        topic_filters =  [t.decode('utf-8') for t in entry.get(ldap_attribute, [])]
+        logger.debug(f"DN: {dn} - {ldap_attribute}={topic_filters}")
 
-        return self.topic_matcher.are_topics_allowed(topic, allowed_topics)
-        # print(f"{self.config.publish_attribute} : ", entry.get(self.config.publish_attribute, []))
-        # print(f"{self.config.subscribe_attribute} : ", entry.get(self.config.subscribe_attribute, []))
-        # print(f"{self.config.receive_attribute} : ", entry.get(self.config.receive_attribute, []))
+        return self.topic_matcher.are_topics_allowed(topic, topic_filters)
 
 
     @dataclass

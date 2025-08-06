@@ -39,7 +39,7 @@ def ldap_service(docker_ip, docker_services):
     return url
 
 @pytest.mark.asyncio
-async def test_ldap(ldap_service):
+async def test_ldap_user_plugin(ldap_service):
     ctx = BrokerContext(Broker())
     ctx.config = LDAPAuthPlugin.Config(
         # server="ldap://localhost:10389",
@@ -52,13 +52,13 @@ async def test_ldap(ldap_service):
     ldap_plugin = LDAPAuthPlugin(context=ctx)
 
     s = Session()
-    s.username = "alpha.beta"
-    s.password = "password456"
+    s.username = "jdoe"
+    s.password = "johndoepassword"
 
     assert await ldap_plugin.authenticate(session=s), "could not authenticate user"
 
 @pytest.mark.asyncio
-async def test_auth_ldap(ldap_service):
+async def test_ldap_user(ldap_service):
 
     cfg = BrokerConfig(
         listeners={ 'default' : ListenerConfig() },
@@ -79,7 +79,7 @@ async def test_auth_ldap(ldap_service):
     await asyncio.sleep(0.1)
 
     client = MQTTClient(config=ClientConfig(auto_reconnect=False))
-    await client.connect('mqtt://gamma.delta:password789@127.0.0.1:1883')
+    await client.connect('mqtt://jdoe:johndoepassword@127.0.0.1:1883')
     await asyncio.sleep(0.1)
     await client.publish('my/topic', b'my message')
     await asyncio.sleep(0.1)
@@ -88,7 +88,7 @@ async def test_auth_ldap(ldap_service):
 
 
 @pytest.mark.asyncio
-async def test_auth_ldap_incorrect_creds(ldap_service):
+async def test_ldap_user_invalid_creds(ldap_service):
 
     cfg = BrokerConfig(
         listeners={ 'default' : ListenerConfig() },
@@ -110,17 +110,16 @@ async def test_auth_ldap_incorrect_creds(ldap_service):
 
     client = MQTTClient(config=ClientConfig(auto_reconnect=False))
     with pytest.raises(ConnectError):
-        await client.connect('mqtt://gamma.delta:wrongpassword@127.0.0.1:1883')
+        await client.connect('mqtt://jdoe:wrongpassword@127.0.0.1:1883')
 
     await broker.shutdown()
 
 
 @pytest.mark.asyncio
-async def test_topic_ldap_plugin():
+async def test_ldap_topic_plugin(ldap_service):
     ctx = BrokerContext(Broker())
     ctx.config = LDAPTopicPlugin.Config(
-        server="ldap://localhost:1389",
-        # server=ldap_service,
+        server=ldap_service,
         base_dn="dc=amqtt,dc=io",
         user_attribute="uid",
         bind_dn="cn=admin,dc=amqtt,dc=io",
@@ -132,7 +131,7 @@ async def test_topic_ldap_plugin():
     ldap_plugin = LDAPTopicPlugin(context=ctx)
 
     s = Session()
-    s.username = "testuser"
-    s.password = "testpassword"
+    s.username = "jdoe"
+    s.password = "wrongpassword"
 
     assert await ldap_plugin.topic_filtering(session=s, topic='my/topic/one', action=Action.PUBLISH), "access not granted"
