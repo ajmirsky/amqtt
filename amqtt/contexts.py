@@ -1,12 +1,13 @@
 from dataclasses import dataclass, field, fields, replace
 import logging
+import warnings
 
 try:
     from enum import Enum, StrEnum
 except ImportError:
     # support for python 3.10
     from enum import Enum
-    class StrEnum(str, Enum):  #type: ignore[no-redef]
+    class StrEnum(str, Enum):  # type: ignore[no-redef]
         pass
 
 from collections.abc import Iterator
@@ -50,14 +51,15 @@ class ListenerType(StrEnum):
         """Display the string value, instead of the enum member."""
         return f'"{self.value!s}"'
 
+
 class Dictable:
     """Add dictionary methods to a dataclass."""
 
-    def __getitem__(self, key:str) -> Any:
+    def __getitem__(self, key: str) -> Any:
         """Allow dict-style `[]` access to a dataclass."""
         return self.get(key)
 
-    def get(self, name:str, default:Any=None) -> Any:
+    def get(self, name: str, default: Any = None) -> Any:
         """Allow dict-style access to a dataclass."""
         name = name.replace("-", "_")
         if hasattr(self, name):
@@ -148,10 +150,10 @@ def default_listeners() -> dict[str, Any]:
 def default_broker_plugins() -> dict[str, Any]:
     """Create defaults for BrokerConfig.plugins."""
     return {
-        "amqtt.plugins.logging_amqtt.EventLoggerPlugin":{},
-        "amqtt.plugins.logging_amqtt.PacketLoggerPlugin":{},
-        "amqtt.plugins.authentication.AnonymousAuthPlugin":{"allow_anonymous":True},
-        "amqtt.plugins.sys.broker.BrokerSysPlugin":{"sys_interval":20}
+        "amqtt.plugins.logging_amqtt.EventLoggerPlugin": {},
+        "amqtt.plugins.logging_amqtt.PacketLoggerPlugin": {},
+        "amqtt.plugins.authentication.AnonymousAuthPlugin": {"allow_anonymous": True},
+        "amqtt.plugins.sys.broker.BrokerSysPlugin": {"sys_interval": 20}
     }
 
 
@@ -159,7 +161,7 @@ def default_broker_plugins() -> dict[str, Any]:
 class BrokerConfig(Dictable):
     """Structured configuration for a broker. Can be passed directly to `amqtt.broker.Broker` or created from a dictionary."""
 
-    listeners: dict[Literal["default"] | str, ListenerConfig] = field(default_factory=default_listeners) # noqa: PYI051
+    listeners: dict[Literal["default"] | str, ListenerConfig] = field(default_factory=default_listeners)  # noqa: PYI051
     """Network of listeners used by the services. a 'default' named listener is required; if another listener
      does not set a value, the 'default' settings are applied. See
      [`ListenerConfig`](broker_config.md#amqtt.contexts.ListenerConfig) for more information."""
@@ -178,7 +180,7 @@ class BrokerConfig(Dictable):
     """*Deprecated field used to config EntryPoint-loaded plugins. See
     [`TopicTabooPlugin`](../plugins/packaged_plugins.md#taboo-topic-plugin) and
     [`TopicACLPlugin`](../plugins/packaged_plugins.md#acl-topic-plugin) for recommended configuration method.*"""
-    plugins: dict[str, Any] | list[str | dict[str,Any]] | None = field(default_factory=default_broker_plugins)
+    plugins: dict[str, Any] | list[str | dict[str, Any]] | None = field(default_factory=default_broker_plugins)
     """The dictionary has a key of the dotted-module path of a class derived from `BasePlugin`, `BaseAuthPlugin`
      or `BaseTopicPlugin`; the value is a dictionary of configuration options for that plugin. See
      [custom plugins](../plugins/custom_plugins.md) for more information. `list[str | dict[str,Any]]` is deprecated but available
@@ -203,7 +205,7 @@ class BrokerConfig(Dictable):
             for plugin in self.plugins:
                 # in case a plugin in a yaml file is listed without config map
                 if isinstance(plugin, str):
-                    _plugins |= {plugin:{}}
+                    _plugins |= {plugin: {}}
                     continue
                 _plugins |= plugin
             self.plugins = _plugins
@@ -263,6 +265,7 @@ class ConnectionConfig(Dictable):
             if isinstance(getattr(self, fn), str):
                 setattr(self, fn, Path(getattr(self, fn)))
 
+
 @dataclass
 class TopicConfig(Dictable):
     """Configuration of how messages to specific topics are published.
@@ -305,7 +308,7 @@ class WillConfig(Dictable):
 def default_client_plugins() -> dict[str, Any]:
     """Create defaults for `ClientConfig.plugins`."""
     return {
-        "amqtt.plugins.logging_amqtt.PacketLoggerPlugin":{}
+        "amqtt.plugins.logging_amqtt.PacketLoggerPlugin": {}
     }
 
 
@@ -333,7 +336,7 @@ class ClientConfig(Dictable):
     """Upon reconnect, should subscriptions be cleared. Can be overridden by `MQTTClient.connect`"""
     topics: dict[str, TopicConfig] | None = field(default_factory=dict)
     """Specify the topics and what flags should be set for messages published to them."""
-    broker: ConnectionConfig | None = field(default_factory=ConnectionConfig)
+    broker: ConnectionConfig | None = None
     """*Deprecated* Configuration for connecting to the broker. Use `connection` field instead."""
     connection: ConnectionConfig = field(default_factory=ConnectionConfig)
     """Configuration for connecting to the broker. See
@@ -355,6 +358,7 @@ class ClientConfig(Dictable):
             raise ValueError(msg)
 
         if self.broker is not None:
+            warnings.warn("The 'broker' option is deprecated, please use 'connection' instead.", stacklevel=2)
             self.connection = self.broker
 
         if bool(not self.connection.keyfile) ^ bool(not self.connection.certfile):

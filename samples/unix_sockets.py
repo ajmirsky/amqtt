@@ -1,19 +1,20 @@
-import contextlib
-import logging
 import asyncio
 from asyncio import StreamWriter, StreamReader, Event
 from functools import partial
+import logging
 from pathlib import Path
+import ssl
 
 import typer
 
+from amqtt.adapters import ReaderAdapter, WriterAdapter
 from amqtt.broker import Broker
 from amqtt.client import ClientContext
-from amqtt.contexts import ClientConfig, BrokerConfig, ListenerConfig, ListenerType
+
+from amqtt.contexts import BrokerConfig, ClientConfig, ListenerConfig, ListenerType
 from amqtt.mqtt3.protocol.client_handler import ClientProtocolHandler
 from amqtt.plugins.manager import PluginManager
 from amqtt.session import Session
-from amqtt.adapters import ReaderAdapter, WriterAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ class UnixStreamWriterAdapter(WriterAdapter):
             await self._writer.drain()
 
     def get_peer_info(self) -> tuple[str, int]:
-        extra_info = self._writer.get_extra_info('socket')
+        extra_info = self._writer.get_extra_info("socket")
         return extra_info.getsockname(), 0
 
     async def close(self) -> None:
@@ -76,13 +77,16 @@ class UnixStreamWriterAdapter(WriterAdapter):
         with contextlib.suppress(AttributeError):
             await self._writer.wait_closed()
 
+    def get_ssl_info(self) -> ssl.SSLObject | None:
+        pass
+
 
 async def run_broker(socket_file: Path):
 
     # configure the broker with a single, external listener
     cfg = BrokerConfig(
         listeners={
-            'default': ListenerConfig(
+            "default": ListenerConfig(
                 type=ListenerType.EXTERNAL
             )
         },
@@ -105,7 +109,7 @@ async def run_broker(socket_file: Path):
         # passes the connection to the broker for protocol communications
         await b.external_connected(reader=r, writer=w, listener_name=listener_name)
 
-    await asyncio.start_unix_server(partial(unix_stream_connected, listener_name='default'), path=socket_file)
+    await asyncio.start_unix_server(partial(unix_stream_connected, listener_name="default"), path=socket_file)
     await b.start()
 
     try:
@@ -159,7 +163,7 @@ async def run_client(socket_file: Path):
     try:
         while True:
             # periodically send a message
-            await cph.mqtt_publish('my/topic', b'my message', 0, False)
+            await cph.mqtt_publish("my/topic", b"my message", 0, False)
             await asyncio.sleep(1)
     except KeyboardInterrupt:
         cph.detach()

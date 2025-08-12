@@ -93,13 +93,14 @@ def mock_plugin_manager():
 
 @pytest.fixture
 async def broker_fixture(test_config):
-    broker = Broker(test_config, plugin_namespace="amqtt.test.plugins")
-    await broker.start()
-    assert broker.transitions.is_started()
-    assert broker._sessions == {}
-    assert "default" in broker._servers
+    with pytest.warns(DeprecationWarning):
+        broker = Broker(test_config, plugin_namespace="amqtt.test.plugins")
+        await broker.start()
+        assert broker.transitions.is_started()
+        assert broker._sessions == {}
+        assert "default" in broker._servers
 
-    yield broker
+        yield broker
 
     if not broker.transitions.is_stopped():
         await broker.shutdown()
@@ -155,3 +156,12 @@ def ca_file_fixture():
         for file in temp_dir.iterdir():
             file.unlink()
         temp_dir.rmdir()
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--mock-docker",
+        action="store",
+        default="false",
+        help="for environments where docker isn't available, mock calls which require docker",
+    )
