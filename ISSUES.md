@@ -31,7 +31,7 @@ tests/
     test_auth.py         # Issue #012
     protocol/
       conftest.py        # broker/client handler fixtures
-      test_handler.py    # Issues #013–#025, #026–#031
+      test_handler.py    # Issues #013–#025e, #026–#031a
 ```
 
 ### Shared fixtures (tests/mqtt5/conftest.py)
@@ -665,6 +665,120 @@ A broker can redirect a client to another server using the `Server Reference` pr
 
 ---
 
+### Issue #025a [MQTT5-BROKER] — Maximum Packet Size enforcement
+
+**Spec:** §3.1.2.11.4, §3.2.2.3.6, §4.13
+
+**Summary:**
+MQTT 5.0 lets either side advertise the maximum MQTT Control Packet size it is willing to receive. The broker must enforce its own receive limit and must not send packets larger than the client's advertised limit.
+
+**Scope:**
+- [ ] Store the client's `Maximum Packet Size` from CONNECT on the session.
+- [ ] Store the broker's configured `Maximum Packet Size` from config and advertise it in CONNACK when configured.
+- [ ] Reject or disconnect v5 clients that send packets larger than the broker's maximum with reason code `0x95 Packet Too Large`.
+- [ ] Before sending any packet to a v5 client, verify the encoded packet size does not exceed the client's advertised maximum.
+- [ ] If an outgoing Application Message cannot be sent because it exceeds the client's maximum, discard it for that client and complete broker-side delivery bookkeeping as if it had been sent.
+- [ ] Ensure Reason String and User Properties are omitted when they would make an error packet exceed the receiver's Maximum Packet Size.
+
+**Acceptance criteria:**
+- [ ] Client sending a packet larger than broker maximum receives DISCONNECT `0x95`.
+- [ ] Broker does not send a PUBLISH larger than the client's CONNECT `Maximum Packet Size`.
+- [ ] Oversized queued/offline messages are discarded for that client without blocking later messages.
+- [ ] Error packets respect the receiver's Maximum Packet Size.
+
+---
+
+### Issue #025b [MQTT5-BROKER] — Optional server feature availability enforcement
+
+**Spec:** §3.2.2.3.4, §3.2.2.3.5, §3.2.2.3.11, §3.2.2.3.12, §3.2.2.3.13, §4.13
+
+**Summary:**
+CONNACK can declare that selected server features are unavailable. The broker must enforce those declarations when a v5 client attempts to use a disabled feature.
+
+**Scope:**
+- [ ] Enforce configured `Maximum QoS`: reject CONNECT Will QoS and incoming PUBLISH QoS greater than the broker's maximum with reason code `0x9B QoS Not Supported`.
+- [ ] Enforce `Retain Available = 0`: reject retained Will messages at CONNECT and retained PUBLISH packets with reason code `0x9A Retain Not Supported`.
+- [ ] Enforce `Wildcard Subscription Available = 0`: reject wildcard SUBSCRIBE packets with DISCONNECT or SUBACK reason code `0xA2 Wildcard Subscriptions Not Supported`.
+- [ ] Enforce `Subscription Identifiers Available = 0`: reject SUBSCRIBE packets containing Subscription Identifier with DISCONNECT `0xA1 Subscription Identifiers Not Supported`.
+- [ ] Enforce `Shared Subscription Available = 0`: reject shared SUBSCRIBE packets with DISCONNECT or SUBACK reason code `0x9E Shared Subscriptions Not Supported`.
+- [ ] Keep v3.1.1 behavior unchanged for equivalent unsupported features.
+
+**Acceptance criteria:**
+- [ ] Each disabled CONNACK feature has at least one test proving the broker rejects client use with the expected v5 reason code.
+- [ ] A v5 client that stays within advertised feature limits can connect, publish, and subscribe normally.
+- [ ] Existing v3 tests continue to pass with default feature availability.
+
+---
+
+### Issue #025c [MQTT5-BROKER] — Problem and response information negotiation
+
+**Spec:** §3.1.2.11.6, §3.1.2.11.7, §3.2.2.3.15, §4.10, §4.13
+
+**Summary:**
+MQTT 5.0 lets a client request response information and suppress diagnostic problem information. The broker should honor both negotiation properties when producing CONNACK, ACK, and DISCONNECT properties.
+
+**Scope:**
+- [ ] Read `Request Response Information` from CONNECT and store the negotiated preference on the session.
+- [ ] Add broker config for optional `Response Information` text.
+- [ ] Include `Response Information` in CONNACK only when the client requested it and broker config provides a value.
+- [ ] Read `Request Problem Information` from CONNECT and store the negotiated preference on the session.
+- [ ] When `Request Problem Information = 0`, do not send Reason String or User Properties on ACK packets other than PUBLISH, CONNACK, or DISCONNECT.
+- [ ] Keep diagnostic Reason String/User Properties behavior unchanged when the property is absent or set to 1.
+
+**Acceptance criteria:**
+- [ ] Client requesting response information receives configured CONNACK `Response Information`.
+- [ ] Client not requesting response information does not receive CONNACK `Response Information`.
+- [ ] Client setting `Request Problem Information = 0` does not receive diagnostic properties on PUBACK/PUBREC/PUBREL/PUBCOMP/SUBACK/UNSUBACK/AUTH.
+- [ ] CONNACK and DISCONNECT diagnostic properties still obey Maximum Packet Size.
+
+---
+
+### Issue #025d [MQTT5-BROKER] — Forward MQTT 5 PUBLISH metadata
+
+**Spec:** §3.3.2.3.2, §3.3.2.3.5, §3.3.2.3.6, §3.3.2.3.7, §3.3.2.3.9, §3.3.4
+
+**Summary:**
+When the broker forwards an Application Message to v5 subscribers, MQTT 5 requires selected PUBLISH properties to be forwarded unaltered. This issue ties packet-level property support to broker routing semantics.
+
+**Scope:**
+- [ ] Preserve `Payload Format Indicator` when forwarding PUBLISH messages to v5 subscribers.
+- [ ] Validate that `Response Topic` does not contain wildcard characters; reject invalid incoming PUBLISH packets with the appropriate v5 error path.
+- [ ] Preserve `Response Topic` unaltered when forwarding to v5 subscribers.
+- [ ] Preserve `Correlation Data` unaltered when forwarding to v5 subscribers.
+- [ ] Preserve all PUBLISH `User Property` entries in original order when forwarding to v5 subscribers.
+- [ ] Preserve `Content Type` unaltered when forwarding to v5 subscribers.
+- [ ] Define and test what is intentionally dropped when forwarding v5 messages to v3.1.1 subscribers.
+
+**Acceptance criteria:**
+- [ ] v5 subscriber receives forwarded PUBLISH with unchanged Payload Format Indicator, Response Topic, Correlation Data, Content Type, and ordered User Properties.
+- [ ] Incoming PUBLISH with wildcard Response Topic is rejected with a protocol error.
+- [ ] v3.1.1 subscribers still receive payload/topic/qos/retain correctly without v5 properties.
+
+---
+
+### Issue #025e [MQTT5-BROKER] — Full Will Properties behavior
+
+**Spec:** §3.1.3.2, §3.3.2.3, §3.3.1.3
+
+**Summary:**
+Will Properties include more than Will Delay. When a Will is eventually published, the broker must apply the Will's message metadata to the generated PUBLISH.
+
+**Scope:**
+- [ ] Store all Will Properties from CONNECT on the Session: Payload Format Indicator, Message Expiry Interval, Content Type, Response Topic, Correlation Data, and User Properties.
+- [ ] Validate Will Response Topic does not contain wildcard characters.
+- [ ] When publishing the Will, include stored Will Properties as PUBLISH Properties for v5 recipients.
+- [ ] Apply Will Message Expiry Interval to the Will Application Message and queued deliveries.
+- [ ] Preserve Will User Properties in order when forwarding the Will to v5 subscribers.
+- [ ] Respect Retain Available and Maximum QoS limits for retained Will and Will QoS.
+
+**Acceptance criteria:**
+- [ ] Will published after ungraceful disconnect carries Content Type, Response Topic, Correlation Data, Payload Format Indicator, and ordered User Properties to v5 subscribers.
+- [ ] Will with Message Expiry Interval expires before delivery when the interval elapses.
+- [ ] Will Response Topic containing wildcards is rejected at CONNECT.
+- [ ] Retained Will is rejected when retained messages are disabled.
+
+---
+
 ## Phase 3 — Client Protocol Handler
 
 ---
@@ -784,6 +898,29 @@ In MQTT 5.0, the broker may send DISCONNECT. The client must handle this gracefu
 
 ---
 
+### Issue #031a [MQTT5-CLIENT] — Enforce negotiated server limits
+
+**Spec:** §3.2.2.3.4, §3.2.2.3.5, §3.2.2.3.6, §3.2.2.3.14, §4.9, §4.13
+
+**Summary:**
+After CONNACK, the client must honor the server's negotiated limits and capability properties. This complements broker-side enforcement and prevents the client API from knowingly sending invalid packets.
+
+**Scope:**
+- [ ] If CONNACK contains `Server Keep Alive`, replace the client's configured keep alive with the server-provided value for the connection.
+- [ ] If CONNACK contains `Maximum QoS`, prevent v5 publishes with QoS greater than the server limit.
+- [ ] If CONNACK contains `Retain Available = 0`, prevent v5 publishes with retain set and retained Will configuration on future v5 connects.
+- [ ] If CONNACK contains `Maximum Packet Size`, prevent all outgoing MQTT Control Packets from exceeding it, not only PUBLISH packets.
+- [ ] If CONNACK disables wildcard subscriptions, subscription identifiers, or shared subscriptions, reject corresponding client API calls before sending SUBSCRIBE.
+- [ ] If the server sends a packet larger than the client's configured `Maximum Packet Size`, close with DISCONNECT `0x95 Packet Too Large` when possible.
+
+**Acceptance criteria:**
+- [ ] Client uses CONNACK `Server Keep Alive` for ping scheduling.
+- [ ] Client rejects publish/subscribe calls that violate advertised server limits before writing bytes.
+- [ ] Client sends DISCONNECT `0x95` or closes cleanly when receiving an oversized server packet.
+- [ ] Default MQTT 3.1.1 client behavior is unchanged.
+
+---
+
 ## Phase 4 — Integration, Conformance & Housekeeping
 
 ---
@@ -896,10 +1033,20 @@ Appendix B of the spec lists every MUST/MUST NOT statement as a numbered checkli
                                                                     │    │  │
 Phase 1 (all packet issues #004–#012) ──────────────────────── depend on ──┘
                                                                     │    │
-Phase 2 (broker issues #013–#025) ─────────────────────────── depend on ──┘ (#003, #003a)
-Phase 3 (client issues #026–#031) ─────────────────────────── depend on ── (#003, #003a)
+Phase 2 (broker issues #013–#025e) ────────────────────────── depend on ──┘ (#003, #003a)
+Phase 3 (client issues #026–#031a) ────────────────────────── depend on ── (#003, #003a)
                                                                     │
 Phase 4 (#032–#036) ──────────────────────────────────────── depend on ── Phase 2 + 3
+
+Broker spec-behavior dependencies:
+#025a (Maximum Packet Size) ───────────── depends on #003a, #014, #021
+#025b (Feature availability) ──────────── depends on #003a, #014, #021
+#025c (Problem/response info) ─────────── depends on #004, #005, #014, #021
+#025d (PUBLISH metadata forwarding) ───── depends on #006, #018, #019, #024
+#025e (Full Will Properties) ──────────── depends on #004, #006, #023, #024, #025b
+
+Client negotiated-limit dependencies:
+#031a (Enforce server limits) ─────────── depends on #026, #027, #028, #031
 ```
 
 Minimum viable path for a first working demo:
