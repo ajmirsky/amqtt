@@ -45,7 +45,7 @@ Define these once; every test file imports them:
 ### Use parametrize for multi-value cases
 
 Any test covering multiple distinct inputs must use `@pytest.mark.parametrize`. Required uses:
-- All 43 property IDs in encode/decode round-trip tests (Issue #001).
+- All MQTT 5.0 property IDs in encode/decode round-trip tests (Issue #001).
 - All reason codes in `ReasonCode` enum (Issue #002).
 - Short form vs. full form for PUBACK/PUBREC/PUBREL/PUBCOMP and DISCONNECT.
 - All subscription option combinations (no_local × retain_as_published × retain_handling values).
@@ -106,20 +106,20 @@ Before starting any Phase 0 issue, read the stubs to understand what scaffolding
 MQTT 5.0 adds a structured Properties section to every packet type. This issue implements the core encode/decode machinery used by all subsequent packet work.
 
 **Scope:**
-- [ ] Create `amqtt/mqtt5/property_ids.py` — all 43 property ID constants with types and which packet types each is valid on.
-- [ ] Create `amqtt/mqtt5/properties.py`:
-  - [ ] `Properties` class with `set(id, value)`, `get(id)`, `has(id)`, `encode() -> bytes`, and `Properties.decode(data: bytes) -> Properties` methods.
-  - [ ] Support all wire types: one-byte integer, two-byte integer, four-byte integer, Variable Byte Integer, UTF-8 string, UTF-8 string pair (User Properties), binary data.
-  - [ ] A property ID appearing more than once in a packet (except User Property `0x26`) MUST raise `MQTTError`.
-  - [ ] User Properties are a list of `(key, value)` string tuples, not a dict, because keys can repeat.
-- [ ] Variable Byte Integer encode/decode (used for property length prefix): move to `amqtt/codecs.py` or a new `amqtt/mqtt5/varint.py`. This is a **refactor of existing code** — the same VBI logic already exists inline in `mqtt3/` packet parsing. Centralising it must not change the behavior of any existing `mqtt3/` packet. Add a regression test that exercises VBI through existing v3 packet parsing after the move.
+- [x] Create `amqtt/mqtt5/property_ids.py` — all MQTT 5.0 property ID constants with types and which packet types each is valid on.
+- [x] Create `amqtt/mqtt5/properties.py`:
+  - [x] `Properties` class with `set(id, value)`, `get(id)`, `has(id)`, `encode() -> bytes`, and `Properties.decode(data: bytes) -> Properties` methods.
+  - [x] Support all wire types: one-byte integer, two-byte integer, four-byte integer, Variable Byte Integer, UTF-8 string, UTF-8 string pair (User Properties), binary data.
+  - [x] A property ID appearing more than once in a packet (except User Property `0x26`) MUST raise `MQTTError`.
+  - [x] User Properties are a list of `(key, value)` string tuples, not a dict, because keys can repeat.
+- [x] Variable Byte Integer encode/decode (used for property length prefix): move to `amqtt/codecs.py` or a new `amqtt/mqtt5/varint.py`. This is a **refactor of existing code** — the same VBI logic already exists inline in `mqtt3/` packet parsing. Centralising it must not change the behavior of any existing `mqtt3/` packet. Add a regression test that exercises VBI through existing v3 packet parsing after the move.
 
 **Acceptance criteria:**
-- [ ] Round-trip test: for every property type, `Properties.decode(p.encode()) == p`.
-- [ ] Test that duplicate non-repeatable properties raise `MQTTError`.
-- [ ] Test User Properties with duplicate keys are preserved in order.
-- [ ] Zero-property encoding produces a single `0x00` byte (empty properties length).
-- [ ] All existing `mqtt3/` packet encode/decode tests still pass after VBI is moved.
+- [x] Round-trip test: for every property type, `Properties.decode(p.encode()) == p`.
+- [x] Test that duplicate non-repeatable properties raise `MQTTError`.
+- [x] Test User Properties with duplicate keys are preserved in order.
+- [x] Zero-property encoding produces a single `0x00` byte (empty properties length).
+- [x] All existing `mqtt3/` packet encode/decode tests still pass after VBI is moved.
 
 ---
 
