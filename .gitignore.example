@@ -1,0 +1,6 @@
+# Agent session logging output
+.agents/turn_log.jsonl
+.agents/turn_log.*.jsonl
+
+# Uncomment if session logs should remain local only.
+# .agents/session-logs/

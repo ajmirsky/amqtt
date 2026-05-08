@@ -1,0 +1,13 @@
+# Copy this to .codex/config.toml or merge it into your existing Codex config.
+# Project-local Codex config must be trusted before Codex will load it.
+
+[features]
+codex_hooks = true
+
+[[hooks.Stop]]
+
+[[hooks.Stop.hooks]]
+type = "command"
+command = 'ROOT=$(git rev-parse --show-toplevel) && AGENT_TURN_LOG="$ROOT/.agents/turn_log.jsonl" python3 "$ROOT/.agents/scripts/agent_log_turn.py"'
+timeout = 30
+statusMessage = "Logging Codex turn"

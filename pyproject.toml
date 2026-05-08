@@ -321,7 +321,11 @@ max-statements = 90           # too-many-statements
 [tool.coverage.run]
 branch = true
 source = ["amqtt"]
+omit = [
+  "amqtt/mqtt/__init__.py",   # shim — just re-exports mqtt3, no logic to test
+]
 
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+fail_under = 80

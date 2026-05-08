@@ -1,6 +1,25 @@
 """INIT."""
 
-__all__ = ["MQTTPacket"]
+__all__ = [
+    "MQTTPacket",
+    "MQTTFixedHeader",
+    "ConnectPacket",
+    "ConnackPacket",
+    "PublishPacket",
+    "PubackPacket",
+    "PubrecPacket",
+    "PubrelPacket",
+    "PubcompPacket",
+    "SubscribePacket",
+    "SubackPacket",
+    "UnsubscribePacket",
+    "UnsubackPacket",
+    "PingReqPacket",
+    "PingRespPacket",
+    "DisconnectPacket",
+    "packet_class",
+    "packet_dict",
+]
 
 from typing import Any, TypeAlias
 

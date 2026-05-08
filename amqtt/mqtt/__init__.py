@@ -63,22 +63,7 @@ if not any(isinstance(f, _AliasFinder) for f in sys.meta_path):
     sys.meta_path.insert(0, _AliasFinder())
 
 
-# Support attribute access: from amqtt.mqtt import constants
-def __getattr__(name):
-    target = f"{TARGET_ROOT}.{name}"
-    try:
-        mod = importlib.import_module(target)
-    except ModuleNotFoundError as e:
-        raise AttributeError(name) from e
-    sys.modules[f"{PKG}.{name}"] = mod
-    return mod
-
-
-# ---- existing finder code above stays the same ----
-
 # Proxy attributes defined in the target root package (e.g., amqtt.mqtt3)
-import importlib
-
 _target_pkg = None
 
 
