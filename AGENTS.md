@@ -46,7 +46,7 @@ amqtt/
   client.py                        # MQTTClient class — public client API
   session.py                       # Session / ApplicationMessage state
   adapters.py                      # ReaderAdapter / WriterAdapter for TCP + WebSocket
-  codecs.py                        # Low-level byte encoding/decoding helpers
+  codecs_amqtt.py                  # Low-level byte encoding/decoding helpers
   events.py                        # BrokerEvents enum
   mqtt/                            # Deprecated shim: amqtt.mqtt.* → amqtt.mqtt3.*
     __init__.py
@@ -91,6 +91,19 @@ tests/
     ...
 ```
 
+## Current Repo State
+
+This file describes the target MQTT 5.0 implementation, but the current working tree is still at the beginning of that effort. Check the tree before assuming a target module already exists.
+
+- `amqtt/mqtt5/` currently contains only package scaffolding: `__init__.py` and `protocol/__init__.py`.
+- `amqtt/mqtt5/properties.py`, `amqtt/mqtt5/property_ids.py`, `amqtt/mqtt5/reason_codes.py`, MQTT 5 packet modules, and MQTT 5 protocol handler modules still need to be created.
+- `tests/mqtt5/` does not currently exist. Existing MQTT packet tests are under `tests/mqtt/`.
+- Shared low-level codec helpers currently live in `amqtt/codecs_amqtt.py`, not `amqtt/codecs.py`.
+- MQTT Remaining Length / Variable Byte Integer encode/decode logic is currently inline in `amqtt/mqtt3/packet.py`; centralizing it must preserve MQTT 3.1.1 behavior.
+- The compatibility shim `amqtt/mqtt/__init__.py` re-exports `amqtt.mqtt3` symbols and must not be broken.
+- Docs are configured with `mkdocs.rtd.yml` and `mkdocs.web.yml`; there is not currently a root `mkdocs.yml`.
+- Agent/session logging scripts are under `.agents/scripts/`. `.claude/` currently contains settings files only.
+
 ## Key Architectural Facts
 
 - MQTT 3.1.1 currently uses protocol level `0x04`.
@@ -100,6 +113,24 @@ tests/
 - `Session` objects hold connection/session state and are tracked by the broker.
 - The plugin system fires async events through `PluginManager`.
 - Transports are wrapped by `ReaderAdapter` and `WriterAdapter`, including TCP and WebSocket support.
+
+## Broker Session and Routing Internals
+
+The current broker is MQTT 3.1.1-oriented. MQTT 5.0 changes should extend these flows carefully instead of bypassing them.
+
+- `Broker._client_connected()` wraps TCP, WebSocket, and external listener streams in adapter objects, acquires listener capacity, initializes the session, then hands the connection to `_handle_client_session()`.
+- CONNECT parsing and validation currently happen in `BrokerProtocolHandler.init_from_connect()`, which calls `ConnectPacket.from_stream(reader)` from `amqtt/mqtt3/connect.py` and rejects any protocol level other than `4`. MQTT 5 version negotiation should branch in or near this path before MQTT 3-only parsing assumptions consume the CONNECT packet incorrectly.
+- Broker session storage is `Broker._sessions: dict[str, tuple[Session, BrokerProtocolHandler]]`. The public `BrokerContext.sessions` and `BrokerContext.get_session()` expose that state to plugins and tests.
+- Clean-session handling and existing-session takeover live in `Broker._initialize_client_session()` and `_handle_client_session()`. Reconnects reuse the existing `Session` for persistent sessions and update connection-specific fields such as will, keep alive, username, and password.
+- `Session` owns in-flight QoS state (`inflight_in`, `inflight_out`), queued retained messages for offline delivery (`retained_messages`), and inbound application messages waiting for broker routing (`delivered_message_queue`).
+- `ProtocolHandler._reader_loop()` currently dispatches packets through `amqtt.mqtt3.packet_class()`. MQTT 5 support will need version-aware packet dispatch once `session.mqtt_version` is known.
+- Incoming PUBLISH packets become `IncomingApplicationMessage` objects in `ProtocolHandler.handle_publish()`, then are placed on `session.delivered_message_queue` by QoS flow handlers.
+- `Broker._client_message_loop()` waits concurrently for disconnects, subscription requests, unsubscription requests, and delivered application messages from the handler.
+- Subscriptions are stored in `Broker._subscriptions: dict[str, list[tuple[Session, int]]]`, keyed by topic filter with `(session, qos)` entries. Subscription authorization uses `_topic_filtering(..., Action.SUBSCRIBE)`.
+- Routing uses `_broadcast_message()` to enqueue a broadcast and `_broadcast_loop()` / `_run_broadcast()` to match topics against subscription filters, authorize receive access with `_topic_filtering(..., Action.RECEIVE)`, and call each target handler's `mqtt_publish()`.
+- Retained publications are stored globally in `Broker._retained_messages`; offline QoS 1/2 messages for persistent non-anonymous sessions are queued on the target `Session.retained_messages`.
+- Topic filter matching is implemented by `Broker._matches()`, including the MQTT 3 rule that wildcard subscriptions beginning with `+` or `#` do not receive `$` topics.
+- Plugin events are part of the broker contract. Relevant routing/session events include `CLIENT_CONNECTED`, `CLIENT_DISCONNECTED`, `CLIENT_SUBSCRIBED`, `CLIENT_UNSUBSCRIBED`, `MESSAGE_RECEIVED`, `MESSAGE_BROADCAST`, and `RETAINED_MESSAGE`.
 
 ## MQTT 5.0 Implementation Goals
 
@@ -160,7 +191,7 @@ Use this layering unless an issue explicitly says otherwise:
    - Preserves duplicate User Properties in order.
 
 3. Shared Variable Byte Integer helpers
-   - Move duplicated MQTT 3.1.1 VBI logic into a shared helper, preferably `amqtt/codecs.py` unless the issue directs otherwise.
+   - Move duplicated MQTT 3.1.1 VBI logic into a shared helper, preferably `amqtt/codecs_amqtt.py` unless the issue directs otherwise.
    - Ensure existing MQTT 3 packet parsing behavior does not change.
 
 4. `amqtt/mqtt5/reason_codes.py`
@@ -171,6 +202,7 @@ Use this layering unless an issue explicitly says otherwise:
    - Add v5 packet modules under `amqtt/mqtt5/`.
    - Prefer subclassing or reusing MQTT 3 classes when the wire format overlaps.
    - Do not fork large blocks of MQTT 3 code unnecessarily.
+   - Follow the MQTT 3 packet class structure described below unless an issue explicitly requires a different shape.
 
 6. MQTT 5 protocol handlers
    - Add version-aware protocol dispatch.
@@ -184,6 +216,43 @@ Use this layering unless an issue explicitly says otherwise:
 
 9. `client.py`
    - Expose MQTT 5 connect, publish, subscribe, receive, AUTH, and server-disconnect behavior.
+
+## Packet Class Structure
+
+MQTT packet modules should preserve the class layering used by `amqtt/mqtt3/`. MQTT 5 packets should use the same shape so shared protocol code can parse, serialize, and dispatch packets consistently.
+
+- `MQTTFixedHeader` in `amqtt/mqtt3/packet.py` represents the packet type, flags, and remaining length. `MQTTPacket.to_bytes()` recalculates `remaining_length` from the serialized variable header and payload.
+- `MQTTVariableHeader` is the abstract base for packet-specific variable headers. MQTT 3 examples include `ConnectVariableHeader` and `PublishVariableHeader`.
+- `PacketIdVariableHeader` is the shared `MQTTVariableHeader` subclass for packets whose variable header is only a packet identifier, such as SUBSCRIBE, UNSUBSCRIBE, PUBACK, PUBREC, PUBREL, and PUBCOMP.
+- `MQTTPayload[TVariableHeader]` is the abstract base for packet payload classes. Payload parsing receives both the fixed header and variable header so it can compute remaining payload length and inspect flags.
+- `MQTTPacket[TVariableHeader, TPayload, TFixedHeader]` is the packet wrapper. Concrete packet classes set `VARIABLE_HEADER`, `PAYLOAD`, and optionally `FIXED_HEADER`, then implement a `build()` classmethod for outgoing packets.
+- `MQTTPacket.from_stream()` performs the standard parse sequence: read or receive the fixed header, parse `VARIABLE_HEADER.from_stream(reader, fixed_header)` when present, parse `PAYLOAD.from_stream(reader, fixed_header, variable_header)` when present, then construct the packet.
+- Concrete packet constructors validate the fixed packet type and default fixed-header flags. For example, SUBSCRIBE defaults to flags `0x02`, PUBLISH manipulates DUP/QoS/retain flags on the fixed header, and simple ACK packets use `PacketIdVariableHeader`.
+- Packet modules should expose convenience properties on the packet class when existing MQTT 3 code does so, but wire ownership stays in the variable header and payload classes.
+- MQTT 5 packet modules should add Properties to the appropriate variable header or payload position defined by the spec, but property encoding/decoding must still go through `amqtt/mqtt5/properties.py`.
+- When a MQTT 5 packet differs only by adding reason codes or properties, prefer a small MQTT 5-specific variable header or packet subclass over duplicating an entire MQTT 3 module.
+
+## Packet Coding Conventions
+
+The MQTT 3 modules are the local style reference for packet code. Follow these conventions for MQTT 5 unless the MQTT 5 wire format requires a different structure.
+
+- Keep one packet family per module, matching `amqtt/mqtt3/`: `connect.py`, `connack.py`, `publish.py`, `subscribe.py`, and so on.
+- Put packet-type constants, reason-code constants, or packet-specific return-code constants at module level when they are local to that packet. Shared MQTT 5 constants belong in `property_ids.py` or `reason_codes.py`.
+- Use `typing_extensions.Self` for classmethod return types while Python 3.10 remains supported.
+- Use `__slots__` on packet variable-header and payload classes when they store fields. This is the prevailing style in MQTT 3 packet modules.
+- Use `bytearray()` while assembling variable-length bytes, then return `bytes | bytearray` consistently with the base class signatures.
+- Use helpers from `amqtt/codecs_amqtt.py` for primitive wire encoding: `encode_string`, `decode_string`, `encode_data_with_length`, `decode_data_with_length`, `int_to_bytes`, `bytes_to_int`, `decode_packet_id`, and `read_or_raise`.
+- Do not read directly from a stream when a codec helper exists. `read_or_raise()` is preferred for fixed-length reads so closed streams become `NoDataError` consistently.
+- Validate fixed packet type in every concrete packet constructor and raise `AMQTTError` when the constructor receives a fixed header for the wrong packet type.
+- Set default fixed-header flags in the constructor, not in `build()`. Examples: PUBREL, SUBSCRIBE, and UNSUBSCRIBE default to flags `0x02`.
+- Keep outgoing packet construction in `build()` classmethods. `build()` should create the variable header and payload, then return the packet instance.
+- Keep parsing in `from_stream()` classmethods. Payload parsers should calculate their byte budget from `fixed_header.remaining_length - variable_header.bytes_length`.
+- If a packet has no variable header or no payload, set `VARIABLE_HEADER = None` or `PAYLOAD = None`; do not create empty placeholder classes.
+- Expose packet convenience properties for commonly used fields such as `packet_id`, `topic_name`, `data`, flags, and return codes. These properties should validate that `variable_header` or `payload` is present before accessing it.
+- Implement `__repr__()` on non-trivial variable-header and payload classes when it helps protocol logging.
+- Keep spec assertion comments close to the check or default they justify, using the existing bracket format such as `# [MQTT-3.8.1-1]`.
+- Preserve current MQTT 3 names and behavior even when they are imperfect. For MQTT 5, use corrected names in new code rather than copying historical typos such as `UnubscribePayload`.
+- Do not reuse `PacketIdVariableHeader` for MQTT 5 ACK packets that include a reason code or properties. Create a MQTT 5-specific variable header that owns packet id, reason code, and properties, while still following the same `MQTTVariableHeader` interface.
 
 ## Backwards Compatibility Rules
 
@@ -227,13 +296,13 @@ ruff check amqtt/
 Build docs:
 
 ```bash
-mkdocs build
+mkdocs build -f mkdocs.rtd.yml
 ```
 
 Preview docs:
 
 ```bash
-mkdocs serve
+mkdocs serve -f mkdocs.rtd.yml
 ```
 
 ## Coding Conventions
@@ -380,6 +449,14 @@ General rules:
 - Include at least one known-good wire byte fixture from the spec or Mosquitto for each packet test module.
 - Use `pytest-asyncio` for async tests.
 - Preserve existing MQTT 3.1.1 tests.
+- Current pytest configuration is in `pyproject.toml`.
+- `pytest` automatically runs coverage with `--cov=amqtt`, `--cov-report=term-missing`, and `--cov-report=html`.
+- Coverage uses branch coverage and `fail_under = 80`; new MQTT 5 code must be tested enough that total coverage stays at or above 80%.
+- Coverage omits only `amqtt/mqtt/__init__.py`; do not add MQTT 5 modules to omit lists.
+- Tests are ignored by Ruff and mypy in project configuration, but new tests should still be readable, deterministic, and typed where it clarifies fixtures.
+- Use existing MQTT 3 packet tests in `tests/mqtt/` as style references for packet round-trip and malformed-input tests.
+- Use root integration tests such as `tests/test_broker.py`, `tests/test_client.py`, `tests/test_broker_config.py`, and `tests/test_session_monitor.py` as style references for broker, client, config, and session behavior.
+- Keep slow or external-service tests out of the narrow MQTT 5 packet suite unless the issue explicitly requires interoperability testing.
 
 MQTT 5 test layout should mirror `amqtt/mqtt5/`:
 
@@ -427,6 +504,8 @@ Documentation uses:
 - `mkdocstrings-python`
 - `--8<--` snippets
 
+The current docs build is configured by `mkdocs.rtd.yml`; `mkdocs.web.yml` is also present for the web variant. There is no root `mkdocs.yml` in the current repo.
+
 Every public class and public method in `amqtt/mqtt5/` must have a Google-style docstring.
 
 Minimum docstrings required:
@@ -447,9 +526,18 @@ When implementing MQTT 5 documentation, create or update:
 - `docs/references/common.md`
 - `docs/plugins/custom_plugins.md`
 - `docs/quickstart.md`
-- `mkdocs.yml`
+- `mkdocs.rtd.yml`
+- `mkdocs.web.yml`, if the web navigation also needs the new page
 
-If `mkdocs.yml` does not exist, create it before docs work. Use `mkdocs new .` as a starting point, then configure site name, Material theme, mkdocstrings, and navigation.
+Documentation style should match the current docs tree:
+
+- Reference pages live in `docs/references/` and use `mkdocstrings` directives such as `::: amqtt.client.MQTTClient`.
+- Public API reference pages should be added to the `Programming API` or `Configuration` navigation in `mkdocs.rtd.yml` as appropriate.
+- Narrative pages such as quickstart and MQTT 5 overview should use short examples and link to reference pages rather than duplicating full API docs.
+- CLI reference pages use `mkdocs-typer2`; do not hand-write generated CLI option tables unless the existing page does.
+- The docs build includes `mkdocs-coverage`, so keep public MQTT 5 objects documented with docstrings and reference pages.
+- Use existing files such as `docs/references/client.md`, `docs/references/common.md`, `docs/references/broker_config.md`, and `docs/quickstart.md` as formatting references.
+- Do not create a root `mkdocs.yml` unless the project intentionally switches away from the current `mkdocs.rtd.yml` / `mkdocs.web.yml` setup.
 
 ## Issue Workflow
 
