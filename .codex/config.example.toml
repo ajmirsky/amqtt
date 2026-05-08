@@ -2,7 +2,7 @@
 # Project-local Codex config must be trusted before Codex will load it.
 
 [features]
-codex_hooks = true
+hooks = true
 
 [[hooks.Stop]]
 

@@ -47,7 +47,7 @@ This package includes both `.codex/config.toml` and `.codex/config.example.toml`
 
 ```toml
 [features]
-codex_hooks = true
+hooks = true
 
 [[hooks.Stop]]
 
