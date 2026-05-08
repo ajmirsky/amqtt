@@ -106,20 +106,20 @@ Before starting any Phase 0 issue, read the stubs to understand what scaffolding
 MQTT 5.0 adds a structured Properties section to every packet type. This issue implements the core encode/decode machinery used by all subsequent packet work.
 
 **Scope:**
-- Create `amqtt/mqtt5/property_ids.py` — all 43 property ID constants with types and which packet types each is valid on.
-- Create `amqtt/mqtt5/properties.py`:
-  - `Properties` class with `set(id, value)`, `get(id)`, `has(id)`, `encode() -> bytes`, and `Properties.decode(data: bytes) -> Properties` methods.
-  - Support all wire types: one-byte integer, two-byte integer, four-byte integer, Variable Byte Integer, UTF-8 string, UTF-8 string pair (User Properties), binary data.
-  - A property ID appearing more than once in a packet (except User Property `0x26`) MUST raise `MQTTError`.
-  - User Properties are a list of `(key, value)` string tuples, not a dict, because keys can repeat.
-- Variable Byte Integer encode/decode (used for property length prefix): move to `amqtt/codecs.py` or a new `amqtt/mqtt5/varint.py`. This is a **refactor of existing code** — the same VBI logic already exists inline in `mqtt3/` packet parsing. Centralising it must not change the behavior of any existing `mqtt3/` packet. Add a regression test that exercises VBI through existing v3 packet parsing after the move.
+- [ ] Create `amqtt/mqtt5/property_ids.py` — all 43 property ID constants with types and which packet types each is valid on.
+- [ ] Create `amqtt/mqtt5/properties.py`:
+  - [ ] `Properties` class with `set(id, value)`, `get(id)`, `has(id)`, `encode() -> bytes`, and `Properties.decode(data: bytes) -> Properties` methods.
+  - [ ] Support all wire types: one-byte integer, two-byte integer, four-byte integer, Variable Byte Integer, UTF-8 string, UTF-8 string pair (User Properties), binary data.
+  - [ ] A property ID appearing more than once in a packet (except User Property `0x26`) MUST raise `MQTTError`.
+  - [ ] User Properties are a list of `(key, value)` string tuples, not a dict, because keys can repeat.
+- [ ] Variable Byte Integer encode/decode (used for property length prefix): move to `amqtt/codecs.py` or a new `amqtt/mqtt5/varint.py`. This is a **refactor of existing code** — the same VBI logic already exists inline in `mqtt3/` packet parsing. Centralising it must not change the behavior of any existing `mqtt3/` packet. Add a regression test that exercises VBI through existing v3 packet parsing after the move.
 
 **Acceptance criteria:**
-- Round-trip test: for every property type, `Properties.decode(p.encode()) == p`.
-- Test that duplicate non-repeatable properties raise `MQTTError`.
-- Test User Properties with duplicate keys are preserved in order.
-- Zero-property encoding produces a single `0x00` byte (empty properties length).
-- All existing `mqtt3/` packet encode/decode tests still pass after VBI is moved.
+- [ ] Round-trip test: for every property type, `Properties.decode(p.encode()) == p`.
+- [ ] Test that duplicate non-repeatable properties raise `MQTTError`.
+- [ ] Test User Properties with duplicate keys are preserved in order.
+- [ ] Zero-property encoding produces a single `0x00` byte (empty properties length).
+- [ ] All existing `mqtt3/` packet encode/decode tests still pass after VBI is moved.
 
 ---
 
@@ -131,18 +131,18 @@ MQTT 5.0 adds a structured Properties section to every packet type. This issue i
 MQTT 5.0 replaces the limited CONNACK return codes with a unified 1-byte Reason Code used across CONNACK, PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK, UNSUBACK, DISCONNECT, and AUTH.
 
 **Scope:**
-- Create `amqtt/mqtt5/reason_codes.py`:
-  - `ReasonCode` `IntEnum` with all ~30 defined values and their byte representations.
-  - Two categories: Success codes (0x00–0x9F, depending on packet) and Error codes (0x80+).
-  - Helper: `ReasonCode.is_error() -> bool` (value >= 0x80).
-  - Human-readable string descriptions for logging.
-- Keep the old MQTT 3.1.1 CONNACK return code constants in `constants.py` — do not remove them.
+- [ ] Create `amqtt/mqtt5/reason_codes.py`:
+  - [ ] `ReasonCode` `IntEnum` with all ~30 defined values and their byte representations.
+  - [ ] Two categories: Success codes (0x00–0x9F, depending on packet) and Error codes (0x80+).
+  - [ ] Helper: `ReasonCode.is_error() -> bool` (value >= 0x80).
+  - [ ] Human-readable string descriptions for logging.
+- [ ] Keep the old MQTT 3.1.1 CONNACK return code constants in `constants.py` — do not remove them.
 
 **Acceptance criteria:**
-- Every reason code in spec Table 2-6 is present.
-- `ReasonCode(0x00).name == "SUCCESS"`.
-- `ReasonCode(0x80).is_error() == True`.
-- `ReasonCode(0x00).is_error() == False`.
+- [ ] Every reason code in spec Table 2-6 is present.
+- [ ] `ReasonCode(0x00).name == "SUCCESS"`.
+- [ ] `ReasonCode(0x80).is_error() == True`.
+- [ ] `ReasonCode(0x00).is_error() == False`.
 
 ---
 
@@ -154,18 +154,18 @@ MQTT 5.0 replaces the limited CONNACK return codes with a unified 1-byte Reason 
 The `Session` class needs to carry the negotiated protocol version and v5-specific state.
 
 **Scope:**
-- Add `session.mqtt_version: int` (4 for MQTT 3.1.1, 5 for MQTT 5.0).
-- Add `session.session_expiry_interval: int` (seconds; 0 = clean on disconnect; `0xFFFF_FFFF` = never).
-- Add `session.receive_maximum: int` (default 65535 per spec §3.1.2.11.3).
-- Add `session.topic_alias_maximum: int` (default 0 — no aliases by default).
-- Add `session.topic_alias_map: dict[int, str]` — alias integer → topic string, per-session.
-- Add `session.subscription_identifiers: dict[str, int]` — topic filter → subscription identifier.
-- Add `session.inflight_qos2_count: int` for flow control tracking.
-- Add `session.maximum_packet_size: int | None` (None = unlimited).
+- [ ] Add `session.mqtt_version: int` (4 for MQTT 3.1.1, 5 for MQTT 5.0).
+- [ ] Add `session.session_expiry_interval: int` (seconds; 0 = clean on disconnect; `0xFFFF_FFFF` = never).
+- [ ] Add `session.receive_maximum: int` (default 65535 per spec §3.1.2.11.3).
+- [ ] Add `session.topic_alias_maximum: int` (default 0 — no aliases by default).
+- [ ] Add `session.topic_alias_map: dict[int, str]` — alias integer → topic string, per-session.
+- [ ] Add `session.subscription_identifiers: dict[str, int]` — topic filter → subscription identifier.
+- [ ] Add `session.inflight_qos2_count: int` for flow control tracking.
+- [ ] Add `session.maximum_packet_size: int | None` (None = unlimited).
 
 **Acceptance criteria:**
-- Existing session construction (without new params) still works unchanged.
-- New fields have documented defaults matching spec defaults.
+- [ ] Existing session construction (without new params) still works unchanged.
+- [ ] New fields have documented defaults matching spec defaults.
 
 ---
 
@@ -175,15 +175,15 @@ The `Session` class needs to carry the negotiated protocol version and v5-specif
 Create the `tests/mqtt5/` directory structure and shared fixtures before any Phase 1 packet tests are written. This prevents each issue from independently inventing incompatible helpers.
 
 **Scope:**
-- Create `tests/mqtt5/__init__.py` and `tests/mqtt5/protocol/__init__.py`.
-- Write `tests/mqtt5/conftest.py` with the fixtures listed in the Testing Conventions section above: `make_reader`, `v5_connect_packet`, `mock_v5_session`, `mock_broker_handler`, `mock_client_handler`.
-- Verify that `pytest tests/mqtt5/` runs and collects zero tests (empty suite passes cleanly) — this confirms the directory structure and conftest are valid before any packet tests exist.
-- Do **not** implement any packet-level tests here; leave that to the individual issues.
+- [ ] Create `tests/mqtt5/__init__.py` and `tests/mqtt5/protocol/__init__.py`.
+- [ ] Write `tests/mqtt5/conftest.py` with the fixtures listed in the Testing Conventions section above: `make_reader`, `v5_connect_packet`, `mock_v5_session`, `mock_broker_handler`, `mock_client_handler`.
+- [ ] Verify that `pytest tests/mqtt5/` runs and collects zero tests (empty suite passes cleanly) — this confirms the directory structure and conftest are valid before any packet tests exist.
+- [ ] Do **not** implement any packet-level tests here; leave that to the individual issues.
 
 **Acceptance criteria:**
-- `pytest tests/mqtt5/ -v` exits 0 with "no tests ran".
-- `mock_v5_session` fixture produces a `Session` with `mqtt_version=5` and all spec-default v5 fields set correctly per Issue #003.
-- `make_reader(b"")` returns a `BufferReader` that immediately raises on read (not silently succeeds).
+- [ ] `pytest tests/mqtt5/ -v` exits 0 with "no tests ran".
+- [ ] `mock_v5_session` fixture produces a `Session` with `mqtt_version=5` and all spec-default v5 fields set correctly per Issue #003.
+- [ ] `make_reader(b"")` returns a `BufferReader` that immediately raises on read (not silently succeeds).
 
 ---
 
@@ -193,16 +193,16 @@ Create the `tests/mqtt5/` directory structure and shared fixtures before any Pha
 Several Phase 2 and Phase 3 issues introduce new config keys (e.g. `receive_maximum`, `topic_alias_maximum`, `session_expiry_interval`, `mqtt_version`). This issue establishes where those keys live and validates them at startup, so later issues can reference a stable schema rather than each inventing their own parsing.
 
 **Scope:**
-- Define the new broker config keys under a `[mqtt5]` section (or flat alongside existing keys — decide and document the choice): `receive_maximum`, `topic_alias_maximum`, `maximum_packet_size`, `shared_subscriptions_available`, `subscription_identifiers_available`, `wildcard_subscriptions_available`.
-- Define the new client config keys: `mqtt_version` (int, default 4), `session_expiry_interval`, `receive_maximum`, `maximum_packet_size`, `topic_alias_maximum`, `user_properties`, `authentication_method`, `authentication_data`.
-- Add validation: unknown or out-of-range values raise a clear `ConfigurationError` at startup.
-- Document each key with its default and the spec section that governs it.
+- [ ] Define the new broker config keys under a `[mqtt5]` section (or flat alongside existing keys — decide and document the choice): `receive_maximum`, `topic_alias_maximum`, `maximum_packet_size`, `shared_subscriptions_available`, `subscription_identifiers_available`, `wildcard_subscriptions_available`.
+- [ ] Define the new client config keys: `mqtt_version` (int, default 4), `session_expiry_interval`, `receive_maximum`, `maximum_packet_size`, `topic_alias_maximum`, `user_properties`, `authentication_method`, `authentication_data`.
+- [ ] Add validation: unknown or out-of-range values raise a clear `ConfigurationError` at startup.
+- [ ] Document each key with its default and the spec section that governs it.
 
 **Acceptance criteria:**
-- A broker started with no v5 config keys uses spec-default values for all new fields.
-- A broker started with an out-of-range `receive_maximum` (e.g. 0 or > 65535) raises `ConfigurationError`.
-- A client config with `mqtt_version=5` and no other v5 keys connects successfully with spec defaults.
-- `docs/references/broker_config.md` and `docs/references/client_config.md` are updated with all new v5 keys; `mkdocs build` passes.
+- [ ] A broker started with no v5 config keys uses spec-default values for all new fields.
+- [ ] A broker started with an out-of-range `receive_maximum` (e.g. 0 or > 65535) raises `ConfigurationError`.
+- [ ] A client config with `mqtt_version=5` and no other v5 keys connects successfully with spec defaults.
+- [ ] `docs/references/broker_config.md` and `docs/references/client_config.md` are updated with all new v5 keys; `mkdocs build` passes.
 
 ---
 
@@ -226,14 +226,14 @@ One issue per packet type that changes in MQTT 5.0. All issues in this phase are
 - Password field is now binary data (arbitrary bytes, not a string).
 
 **Scope:**
-- Extend existing `ConnectPacket` (or add `ConnectV5Packet`) to parse and produce v5 CONNECT packets.
-- Implement Will Properties decode/encode.
-- Implement CONNECT Properties decode/encode.
+- [ ] Extend existing `ConnectPacket` (or add `ConnectV5Packet`) to parse and produce v5 CONNECT packets.
+- [ ] Implement Will Properties decode/encode.
+- [ ] Implement CONNECT Properties decode/encode.
 
 **Acceptance criteria:**
-- Can parse raw bytes of a known-good v5 CONNECT packet (from spec example or captured traffic).
-- Can encode a v5 CONNECT packet and decode it back with identical fields (round-trip).
-- v3.1.1 CONNECT parsing is unaffected.
+- [ ] Can parse raw bytes of a known-good v5 CONNECT packet (from spec example or captured traffic).
+- [ ] Can encode a v5 CONNECT packet and decode it back with identical fields (round-trip).
+- [ ] v3.1.1 CONNECT parsing is unaffected.
 
 ---
 
@@ -246,12 +246,12 @@ One issue per packet type that changes in MQTT 5.0. All issues in this phase are
 - New CONNACK Properties section (§3.2.2.3): Session Expiry Interval, Receive Maximum, Maximum QoS, Retain Available, Maximum Packet Size, Assigned Client Identifier, Topic Alias Maximum, Reason String, User Properties, Wildcard Subscription Available, Subscription Identifiers Available, Shared Subscription Available, Server Keep Alive, Response Information, Server Reference, Authentication Method, Authentication Data.
 
 **Scope:**
-- Extend `ConnackPacket` to produce and parse v5 CONNACK with Properties.
-- `ConnackPacket.build()` must accept a `ReasonCode` and optional `Properties`.
+- [ ] Extend `ConnackPacket` to produce and parse v5 CONNACK with Properties.
+- [ ] `ConnackPacket.build()` must accept a `ReasonCode` and optional `Properties`.
 
 **Acceptance criteria:**
-- Round-trip test with at least: Reason Code, Assigned Client Identifier, Session Expiry Interval, Reason String.
-- v3.1.1 CONNACK unaffected.
+- [ ] Round-trip test with at least: Reason Code, Assigned Client Identifier, Session Expiry Interval, Reason String.
+- [ ] v3.1.1 CONNACK unaffected.
 
 ---
 
@@ -265,12 +265,12 @@ One issue per packet type that changes in MQTT 5.0. All issues in this phase are
 - Subscription Identifier may appear multiple times (once per matched subscription).
 
 **Scope:**
-- Extend `PublishPacket` to encode/decode v5 Properties.
-- Handle zero-length topic name (alias path).
+- [ ] Extend `PublishPacket` to encode/decode v5 Properties.
+- [ ] Handle zero-length topic name (alias path).
 
 **Acceptance criteria:**
-- Round-trip test with: Payload Format Indicator, Message Expiry Interval, Response Topic, Content Type, User Properties.
-- Zero-length topic with Topic Alias encodes correctly.
+- [ ] Round-trip test with: Payload Format Indicator, Message Expiry Interval, Response Topic, Content Type, User Properties.
+- [ ] Zero-length topic with Topic Alias encodes correctly.
 
 ---
 
@@ -283,14 +283,14 @@ One issue per packet type that changes in MQTT 5.0. All issues in this phase are
 - When Reason Code is 0x00 (Success) and there are no properties, the variable header MAY be omitted (remaining length = 2, just packet ID). Parsers must handle both forms.
 
 **Scope:**
-- Extend `PubackPacket`, `PubrecPacket`, `PubrelPacket`, `PubcompPacket`.
-- Each gains optional `reason_code: ReasonCode` and `properties: Properties | None`.
-- Encode: omit reason code + properties when both would be default (success, no props) for wire efficiency.
+- [ ] Extend `PubackPacket`, `PubrecPacket`, `PubrelPacket`, `PubcompPacket`.
+- [ ] Each gains optional `reason_code: ReasonCode` and `properties: Properties | None`.
+- [ ] Encode: omit reason code + properties when both would be default (success, no props) for wire efficiency.
 
 **Acceptance criteria:**
-- Round-trip test: full form (with reason code + properties) and short form (packet ID only).
-- Parser handles both forms correctly.
-- v3.1.1 packets unaffected.
+- [ ] Round-trip test: full form (with reason code + properties) and short form (packet ID only).
+- [ ] Parser handles both forms correctly.
+- [ ] v3.1.1 packets unaffected.
 
 ---
 
@@ -303,13 +303,13 @@ One issue per packet type that changes in MQTT 5.0. All issues in this phase are
 - Each topic filter in the payload now has 3 extra option bits (§3.8.3.1): Maximum QoS (2 bits, existing), No Local (1 bit), Retain As Published (1 bit), Retain Handling (2 bits).
 
 **Scope:**
-- Extend `SubscribePacket` with Properties.
-- Add `SubscriptionOptions` data class: `max_qos`, `no_local`, `retain_as_published`, `retain_handling`.
-- Update subscription topic list to carry `(topic_filter, SubscriptionOptions)` pairs.
+- [ ] Extend `SubscribePacket` with Properties.
+- [ ] Add `SubscriptionOptions` data class: `max_qos`, `no_local`, `retain_as_published`, `retain_handling`.
+- [ ] Update subscription topic list to carry `(topic_filter, SubscriptionOptions)` pairs.
 
 **Acceptance criteria:**
-- Round-trip test with Subscription Identifier and all four option bits set.
-- Default options match v3.1.1 semantics (retain_handling=0, no_local=False, retain_as_published=False).
+- [ ] Round-trip test with Subscription Identifier and all four option bits set.
+- [ ] Default options match v3.1.1 semantics (retain_handling=0, no_local=False, retain_as_published=False).
 
 ---
 
@@ -322,10 +322,10 @@ One issue per packet type that changes in MQTT 5.0. All issues in this phase are
 - New SUBACK Properties section: Reason String, User Properties.
 
 **Scope:**
-- Extend `SubackPacket` with Properties and `ReasonCode` per-topic payload.
+- [ ] Extend `SubackPacket` with Properties and `ReasonCode` per-topic payload.
 
 **Acceptance criteria:**
-- Round-trip test with mixed success/error reason codes and Reason String property.
+- [ ] Round-trip test with mixed success/error reason codes and Reason String property.
 
 ---
 
@@ -338,12 +338,12 @@ One issue per packet type that changes in MQTT 5.0. All issues in this phase are
 - UNSUBACK: new Properties section (Reason String, User Properties) + per-topic Reason Code payload (was empty in v3.1.1).
 
 **Scope:**
-- Extend `UnsubscribePacket` with Properties.
-- Extend `UnsubackPacket` with Properties and per-topic `ReasonCode` payload.
+- [ ] Extend `UnsubscribePacket` with Properties.
+- [ ] Extend `UnsubackPacket` with Properties and per-topic `ReasonCode` payload.
 
 **Acceptance criteria:**
-- Round-trip test for both packets.
-- UNSUBACK with mixed success/error reason codes per topic.
+- [ ] Round-trip test for both packets.
+- [ ] UNSUBACK with mixed success/error reason codes per topic.
 
 ---
 
@@ -357,13 +357,13 @@ One issue per packet type that changes in MQTT 5.0. All issues in this phase are
 - Properties (§3.14.2.2): Session Expiry Interval (client can extend on DISCONNECT), Reason String, User Properties, Server Reference.
 
 **Scope:**
-- Extend `DisconnectPacket` with `reason_code: ReasonCode` and `properties: Properties | None`.
-- Allow server-initiated disconnect path (currently not in the codebase).
-- Short form: when reason code is 0x00 and no properties, remaining length = 0 (no variable header). Parser must handle both.
+- [ ] Extend `DisconnectPacket` with `reason_code: ReasonCode` and `properties: Properties | None`.
+- [ ] Allow server-initiated disconnect path (currently not in the codebase).
+- [ ] Short form: when reason code is 0x00 and no properties, remaining length = 0 (no variable header). Parser must handle both.
 
 **Acceptance criteria:**
-- Round-trip test for full and short forms.
-- Server Reference property properly encodes/decodes.
+- [ ] Round-trip test for full and short forms.
+- [ ] Server Reference property properly encodes/decodes.
 
 ---
 
@@ -375,14 +375,14 @@ One issue per packet type that changes in MQTT 5.0. All issues in this phase are
 AUTH is a new packet type (`0x0F`) used for extended authentication (challenge-response flows after CONNECT). There is no v3.1.1 equivalent.
 
 **Scope:**
-- Create `amqtt/mqtt5/auth.py` with `AuthPacket`.
-- Fixed header: type `0x0F`, reserved flags `0x00`.
-- Variable header: Reason Code (one of: `0x00` Success, `0x18` Continue Authentication, `0x19` Re-authenticate), then Properties section.
-- Properties: Authentication Method, Authentication Data, Reason String, User Properties.
+- [ ] Create `amqtt/mqtt5/auth.py` with `AuthPacket`.
+- [ ] Fixed header: type `0x0F`, reserved flags `0x00`.
+- [ ] Variable header: Reason Code (one of: `0x00` Success, `0x18` Continue Authentication, `0x19` Re-authenticate), then Properties section.
+- [ ] Properties: Authentication Method, Authentication Data, Reason String, User Properties.
 
 **Acceptance criteria:**
-- Round-trip test with each valid reason code.
-- AUTH packet with no properties encodes to 2 bytes of variable header.
+- [ ] Round-trip test with each valid reason code.
+- [ ] AUTH packet with no properties encodes to 2 bytes of variable header.
 
 ---
 
@@ -398,17 +398,17 @@ AUTH is a new packet type (`0x0F`) used for extended authentication (challenge-r
 The broker's `mqtt_connect()` method currently hard-codes protocol level 4. It needs to detect v3 vs v5 and take the appropriate code path.
 
 **Scope:**
-- Read Protocol Level byte from CONNECT; if not 4 or 5, send CONNACK with reason code `0x84 Unsupported Protocol Version` and close.
-- Store negotiated version on `session.mqtt_version`.
-- All subsequent packet operations in the handler must be version-aware.
-- v3.1.1 path must be unchanged in behavior.
-- **Version-aware packet dispatch**: after CONNECT, every call to `read_packet()` (or equivalent) must produce the correct v3 or v5 packet class based on `session.mqtt_version`. The two options are: (a) a single dispatcher that checks the fixed-header type byte and delegates to the right module, or (b) two separate handler subclasses that each call their own packet factories. Decide and document the approach here; all Phase 1 packet classes must conform to it. The chosen approach also determines whether `from_stream()` classmethods are version-agnostic (option a) or each handler calls its own module directly (option b).
+- [ ] Read Protocol Level byte from CONNECT; if not 4 or 5, send CONNACK with reason code `0x84 Unsupported Protocol Version` and close.
+- [ ] Store negotiated version on `session.mqtt_version`.
+- [ ] All subsequent packet operations in the handler must be version-aware.
+- [ ] v3.1.1 path must be unchanged in behavior.
+- [ ] **Version-aware packet dispatch**: after CONNECT, every call to `read_packet()` (or equivalent) must produce the correct v3 or v5 packet class based on `session.mqtt_version`. The two options are: (a) a single dispatcher that checks the fixed-header type byte and delegates to the right module, or (b) two separate handler subclasses that each call their own packet factories. Decide and document the approach here; all Phase 1 packet classes must conform to it. The chosen approach also determines whether `from_stream()` classmethods are version-agnostic (option a) or each handler calls its own module directly (option b).
 
 **Acceptance criteria:**
-- A v5 client can complete a CONNECT/CONNACK handshake with the broker.
-- A client sending an unknown protocol level (e.g. 3 or 6) is refused cleanly.
-- Existing v3 integration tests still pass.
-- A v5 PUBLISH received after CONNECT is decoded as a `mqtt5.PublishPacket`, not `mqtt3.PublishPacket`.
+- [ ] A v5 client can complete a CONNECT/CONNACK handshake with the broker.
+- [ ] A client sending an unknown protocol level (e.g. 3 or 6) is refused cleanly.
+- [ ] Existing v3 integration tests still pass.
+- [ ] A v5 PUBLISH received after CONNECT is decoded as a `mqtt5.PublishPacket`, not `mqtt3.PublishPacket`.
 
 ---
 
@@ -421,19 +421,19 @@ When accepting a v5 client, the broker should populate the CONNACK Properties th
 
 **Scope:**
 Send the following CONNACK Properties for v5 connections:
-- `Receive Maximum` — broker's receive maximum (configurable, default 65535).
-- `Maximum QoS` — if broker is configured to limit QoS.
-- `Retain Available` — whether broker supports retained messages.
-- `Maximum Packet Size` — if broker imposes a limit.
-- `Topic Alias Maximum` — broker's limit on aliases (configurable, default 0 = no aliases).
-- `Wildcard Subscription Available` — always true unless disabled.
-- `Subscription Identifiers Available` — always true unless disabled.
-- `Shared Subscription Available` — true if broker supports shared subscriptions.
-- `Assigned Client Identifier` — if broker assigned the client ID.
+- [ ] `Receive Maximum` — broker's receive maximum (configurable, default 65535).
+- [ ] `Maximum QoS` — if broker is configured to limit QoS.
+- [ ] `Retain Available` — whether broker supports retained messages.
+- [ ] `Maximum Packet Size` — if broker imposes a limit.
+- [ ] `Topic Alias Maximum` — broker's limit on aliases (configurable, default 0 = no aliases).
+- [ ] `Wildcard Subscription Available` — always true unless disabled.
+- [ ] `Subscription Identifiers Available` — always true unless disabled.
+- [ ] `Shared Subscription Available` — true if broker supports shared subscriptions.
+- [ ] `Assigned Client Identifier` — if broker assigned the client ID.
 
 **Acceptance criteria:**
-- `Receive Maximum` is always sent for v5 connections.
-- Client test that reads CONNACK Properties and verifies at least `Receive Maximum` and `Topic Alias Maximum`.
+- [ ] `Receive Maximum` is always sent for v5 connections.
+- [ ] Client test that reads CONNACK Properties and verifies at least `Receive Maximum` and `Topic Alias Maximum`.
 
 ---
 
@@ -445,17 +445,17 @@ Send the following CONNACK Properties for v5 connections:
 MQTT 5.0 decouples session persistence from the connect call. Session Expiry Interval (property in CONNECT) replaces the old Clean Session flag. Session expiry can also be updated in DISCONNECT.
 
 **Scope:**
-- On v5 CONNECT: read `Session Expiry Interval` property (default 0 if absent = clean session).
-- If `0`: delete session on disconnect (equivalent to clean session).
-- If non-zero: persist session for that many seconds after disconnect.
-- If `0xFFFF_FFFF`: persist session indefinitely.
-- On v5 DISCONNECT from client: if `Session Expiry Interval` property is present, use it to update the session expiry (except: cannot change from 0 to non-zero — that's a protocol error).
-- Broker sends CONNACK with Session Present flag correctly set.
+- [ ] On v5 CONNECT: read `Session Expiry Interval` property (default 0 if absent = clean session).
+- [ ] If `0`: delete session on disconnect (equivalent to clean session).
+- [ ] If non-zero: persist session for that many seconds after disconnect.
+- [ ] If `0xFFFF_FFFF`: persist session indefinitely.
+- [ ] On v5 DISCONNECT from client: if `Session Expiry Interval` property is present, use it to update the session expiry (except: cannot change from 0 to non-zero — that's a protocol error).
+- [ ] Broker sends CONNACK with Session Present flag correctly set.
 
 **Acceptance criteria:**
-- Client connecting with Session Expiry Interval = 0 gets a clean session.
-- Client connecting with Session Expiry Interval = 300 has session preserved for 5 minutes after disconnect.
-- Client attempting to set expiry from 0 to non-zero in DISCONNECT receives DISCONNECT with reason code `0x82 Protocol Error`.
+- [ ] Client connecting with Session Expiry Interval = 0 gets a clean session.
+- [ ] Client connecting with Session Expiry Interval = 300 has session preserved for 5 minutes after disconnect.
+- [ ] Client attempting to set expiry from 0 to non-zero in DISCONNECT receives DISCONNECT with reason code `0x82 Protocol Error`.
 
 ---
 
@@ -467,15 +467,15 @@ MQTT 5.0 decouples session persistence from the connect call. Session Expiry Int
 Either side can limit the number of in-flight QoS 1 and QoS 2 publishes using `Receive Maximum`. The broker must respect the client's limit when sending, and enforce its own limit when receiving.
 
 **Scope:**
-- Track per-session in-flight QoS 1/2 publish count.
-- When sending to a v5 client: do not exceed the client's `Receive Maximum` from CONNECT Properties.
-- When receiving from a v5 client: if the client exceeds the broker's `Receive Maximum` (from CONNACK), send DISCONNECT with reason code `0x93 Receive Maximum Exceeded`.
-- Implement a flow-control gate: queue additional publishes until in-flight count drops below the limit when a PUBACK/PUBCOMP is received.
+- [ ] Track per-session in-flight QoS 1/2 publish count.
+- [ ] When sending to a v5 client: do not exceed the client's `Receive Maximum` from CONNECT Properties.
+- [ ] When receiving from a v5 client: if the client exceeds the broker's `Receive Maximum` (from CONNACK), send DISCONNECT with reason code `0x93 Receive Maximum Exceeded`.
+- [ ] Implement a flow-control gate: queue additional publishes until in-flight count drops below the limit when a PUBACK/PUBCOMP is received.
 
 **Acceptance criteria:**
-- Broker correctly limits outgoing QoS 1 publishes to client's declared Receive Maximum.
-- Client exceeding broker's Receive Maximum triggers DISCONNECT `0x93`.
-- QoS 0 messages are not counted (they are not flow-controlled).
+- [ ] Broker correctly limits outgoing QoS 1 publishes to client's declared Receive Maximum.
+- [ ] Client exceeding broker's Receive Maximum triggers DISCONNECT `0x93`.
+- [ ] QoS 0 messages are not counted (they are not flow-controlled).
 
 ---
 
@@ -487,15 +487,15 @@ Either side can limit the number of in-flight QoS 1 and QoS 2 publishes using `R
 Topic Aliases allow replacing the full topic string in PUBLISH with a short integer. The broker must handle aliases in both directions.
 
 **Scope:**
-- **Receiving from client**: maintain a per-session alias-to-topic mapping. A PUBLISH with a non-zero Topic Alias and a non-empty Topic Name establishes or updates the mapping. A PUBLISH with a non-zero alias and empty Topic Name uses the existing mapping. If no mapping exists for an alias, send DISCONNECT `0x82 Protocol Error`.
-- **Sending to client**: optionally use topic aliases when sending PUBLISH to a v5 client, if `Topic Alias Maximum` in the CONNECT Properties is > 0. The broker assigns alias IDs; this is optional for this first iteration — mark as a stretch goal.
-- Enforce: alias value 0 is invalid; disconnect with `0x82`.
-- Enforce: alias value > client's `Topic Alias Maximum` from CONNACK; disconnect with `0x94 Topic Alias Invalid`.
+- [ ] **Receiving from client**: maintain a per-session alias-to-topic mapping. A PUBLISH with a non-zero Topic Alias and a non-empty Topic Name establishes or updates the mapping. A PUBLISH with a non-zero alias and empty Topic Name uses the existing mapping. If no mapping exists for an alias, send DISCONNECT `0x82 Protocol Error`.
+- [ ] **Sending to client**: optionally use topic aliases when sending PUBLISH to a v5 client, if `Topic Alias Maximum` in the CONNECT Properties is > 0. The broker assigns alias IDs; this is optional for this first iteration — mark as a stretch goal.
+- [ ] Enforce: alias value 0 is invalid; disconnect with `0x82`.
+- [ ] Enforce: alias value > client's `Topic Alias Maximum` from CONNACK; disconnect with `0x94 Topic Alias Invalid`.
 
 **Acceptance criteria:**
-- Client can establish a topic alias with a PUBLISH and then use it in subsequent publishes.
-- Invalid alias (0 or out-of-range) triggers DISCONNECT with correct reason code.
-- Broker → client alias sending is out of scope for this issue; track in a follow-up.
+- [ ] Client can establish a topic alias with a PUBLISH and then use it in subsequent publishes.
+- [ ] Invalid alias (0 or out-of-range) triggers DISCONNECT with correct reason code.
+- [ ] Broker → client alias sending is out of scope for this issue; track in a follow-up.
 
 ---
 
@@ -510,16 +510,16 @@ MQTT 5.0 SUBSCRIBE adds three new per-subscription flags:
 - **Retain Handling**: controls whether retained messages are sent on subscribe: 0 = send, 1 = send only if subscription did not already exist, 2 = never send.
 
 **Scope:**
-- Store subscription options alongside topic filter in session/broker subscription store.
-- Apply **No Local** filter before delivering to a matching subscriber.
-- Apply **Retain As Published** when forwarding (preserve or clear RETAIN bit).
-- Apply **Retain Handling** when processing SUBSCRIBE and deciding whether to deliver retained messages.
+- [ ] Store subscription options alongside topic filter in session/broker subscription store.
+- [ ] Apply **No Local** filter before delivering to a matching subscriber.
+- [ ] Apply **Retain As Published** when forwarding (preserve or clear RETAIN bit).
+- [ ] Apply **Retain Handling** when processing SUBSCRIBE and deciding whether to deliver retained messages.
 
 **Acceptance criteria:**
-- No Local: publisher does not receive its own messages on a matching subscription.
-- Retain As Published: subscribers with this option see RETAIN=1 on retained messages they receive.
-- Retain Handling 1: no retained message on re-subscribe.
-- Retain Handling 2: no retained messages ever on subscribe.
+- [ ] No Local: publisher does not receive its own messages on a matching subscription.
+- [ ] Retain As Published: subscribers with this option see RETAIN=1 on retained messages they receive.
+- [ ] Retain Handling 1: no retained message on re-subscribe.
+- [ ] Retain Handling 2: no retained messages ever on subscribe.
 
 ---
 
@@ -531,15 +531,15 @@ MQTT 5.0 SUBSCRIBE adds three new per-subscription flags:
 A client may attach a Subscription Identifier integer to a SUBSCRIBE. When the broker delivers a PUBLISH that matches that subscription, it MUST include the Subscription Identifier in the PUBLISH Properties. A single PUBLISH can carry multiple identifiers if it matches multiple subscriptions.
 
 **Scope:**
-- Store subscription identifier (if present) in the broker's subscription record.
-- When delivering a PUBLISH for v5 clients, look up all matching subscriptions and collect their identifiers.
-- Add all collected identifiers as `Subscription Identifier` properties in the outgoing PUBLISH (one property entry per identifier).
-- Subscription Identifier = 0 is a protocol error; send DISCONNECT `0x82`.
+- [ ] Store subscription identifier (if present) in the broker's subscription record.
+- [ ] When delivering a PUBLISH for v5 clients, look up all matching subscriptions and collect their identifiers.
+- [ ] Add all collected identifiers as `Subscription Identifier` properties in the outgoing PUBLISH (one property entry per identifier).
+- [ ] Subscription Identifier = 0 is a protocol error; send DISCONNECT `0x82`.
 
 **Acceptance criteria:**
-- Client subscribing with identifier 42 receives PUBLISH with `Subscription Identifier = 42` in properties.
-- A PUBLISH matching two subscriptions (e.g. overlapping filters) includes both identifiers.
-- Identifier 0 causes DISCONNECT.
+- [ ] Client subscribing with identifier 42 receives PUBLISH with `Subscription Identifier = 42` in properties.
+- [ ] A PUBLISH matching two subscriptions (e.g. overlapping filters) includes both identifiers.
+- [ ] Identifier 0 causes DISCONNECT.
 
 ---
 
@@ -551,16 +551,16 @@ A client may attach a Subscription Identifier integer to a SUBSCRIBE. When the b
 Shared subscriptions use the topic filter syntax `$share/{ShareName}/{filter}` and cause the broker to deliver each matching PUBLISH to exactly one of the subscribers in the group (load-balancing). The delivery order within the group is not mandated.
 
 **Scope:**
-- Parse the `$share/` prefix in SUBSCRIBE.
-- Maintain a broker-level shared subscription group registry: `{share_name}/{filter}` → list of `Session`.
-- On PUBLISH matching the filter, select one session from the group (round-robin is fine for v1).
-- UNSUBACK reason code `0x11 Shared Subscriptions Not Supported` if shared subscriptions are disabled in broker config.
-- Sessions that disconnect with a persistent session remain in the group; messages to them are queued.
+- [ ] Parse the `$share/` prefix in SUBSCRIBE.
+- [ ] Maintain a broker-level shared subscription group registry: `{share_name}/{filter}` → list of `Session`.
+- [ ] On PUBLISH matching the filter, select one session from the group (round-robin is fine for v1).
+- [ ] UNSUBACK reason code `0x11 Shared Subscriptions Not Supported` if shared subscriptions are disabled in broker config.
+- [ ] Sessions that disconnect with a persistent session remain in the group; messages to them are queued.
 
 **Acceptance criteria:**
-- Two clients subscribing to `$share/workers/jobs/#` receive alternating messages from a publisher.
-- Unsubscribing removes the session from the group.
-- A third client subscribing to `jobs/#` (non-shared) still receives all messages.
+- [ ] Two clients subscribing to `$share/workers/jobs/#` receive alternating messages from a publisher.
+- [ ] Unsubscribing removes the session from the group.
+- [ ] A third client subscribing to `jobs/#` (non-shared) still receives all messages.
 
 ---
 
@@ -572,14 +572,14 @@ Shared subscriptions use the topic filter syntax `$share/{ShareName}/{filter}` a
 In MQTT 5.0 the broker may send DISCONNECT before closing a connection, to inform the client of the reason.
 
 **Scope:**
-- Add `BrokerProtocolHandler.mqtt_send_disconnect(reason_code, reason_string=None)` coroutine.
-- Call it in all broker-side error paths for v5 sessions before closing the connection.
-- Key reason codes the broker should send: `0x81 Malformed Packet`, `0x82 Protocol Error`, `0x93 Receive Maximum Exceeded`, `0x94 Topic Alias Invalid`, `0x95 Topic Name Invalid`, `0x97 Quota Exceeded`, `0x9A Retain Not Supported`, `0x9B QoS Not Supported`, `0x9C Use Another Server`, `0x9D Server Moved`, `0x98 Connection Rate Exceeded`.
-- For v3 sessions, continue the current behavior (close without DISCONNECT).
+- [ ] Add `BrokerProtocolHandler.mqtt_send_disconnect(reason_code, reason_string=None)` coroutine.
+- [ ] Call it in all broker-side error paths for v5 sessions before closing the connection.
+- [ ] Key reason codes the broker should send: `0x81 Malformed Packet`, `0x82 Protocol Error`, `0x93 Receive Maximum Exceeded`, `0x94 Topic Alias Invalid`, `0x95 Topic Name Invalid`, `0x97 Quota Exceeded`, `0x9A Retain Not Supported`, `0x9B QoS Not Supported`, `0x9C Use Another Server`, `0x9D Server Moved`, `0x98 Connection Rate Exceeded`.
+- [ ] For v3 sessions, continue the current behavior (close without DISCONNECT).
 
 **Acceptance criteria:**
-- Protocol error on a v5 client results in a DISCONNECT packet being received by the client before TCP close.
-- v3 client behavior is unchanged.
+- [ ] Protocol error on a v5 client results in a DISCONNECT packet being received by the client before TCP close.
+- [ ] v3 client behavior is unchanged.
 
 ---
 
@@ -591,18 +591,18 @@ In MQTT 5.0 the broker may send DISCONNECT before closing a connection, to infor
 MQTT 5.0 adds an AUTH packet that enables SASL-style challenge-response authentication. The broker receives CONNECT with `Authentication Method` property, may challenge via AUTH, and finally accepts or rejects via CONNACK.
 
 **Scope:**
-- Detect `Authentication Method` property in v5 CONNECT.
-- If method is not recognized, send CONNACK `0x8C Bad Authentication Method`.
-- For recognized methods: implement the plugin hook `on_mqtt_auth(client_id, auth_method, auth_data)` that plugins can implement to perform multi-step auth.
-- Broker sends AUTH `0x18 Continue Authentication` if the plugin needs another round.
-- Client responds with AUTH `0x18`; broker eventually sends CONNACK `0x00 Success` or `0x87 Not Authorized`.
-- Re-authentication: client sends AUTH `0x19 Re-authenticate` mid-session; broker follows same flow.
+- [ ] Detect `Authentication Method` property in v5 CONNECT.
+- [ ] If method is not recognized, send CONNACK `0x8C Bad Authentication Method`.
+- [ ] For recognized methods: implement the plugin hook `on_mqtt_auth(client_id, auth_method, auth_data)` that plugins can implement to perform multi-step auth.
+- [ ] Broker sends AUTH `0x18 Continue Authentication` if the plugin needs another round.
+- [ ] Client responds with AUTH `0x18`; broker eventually sends CONNACK `0x00 Success` or `0x87 Not Authorized`.
+- [ ] Re-authentication: client sends AUTH `0x19 Re-authenticate` mid-session; broker follows same flow.
 
 **Acceptance criteria:**
-- A test plugin implementing a trivial two-round auth (challenge + response) completes successfully.
-- Unknown auth method produces CONNACK `0x8C`.
-- Re-authentication mid-session works.
-- `docs/plugins/custom_plugins.md` Broker events list is updated with `on_mqtt_auth` signature and challenge-response flow description.
+- [ ] A test plugin implementing a trivial two-round auth (challenge + response) completes successfully.
+- [ ] Unknown auth method produces CONNACK `0x8C`.
+- [ ] Re-authentication mid-session works.
+- [ ] `docs/plugins/custom_plugins.md` Broker events list is updated with `on_mqtt_auth` signature and challenge-response flow description.
 
 ---
 
@@ -614,15 +614,15 @@ MQTT 5.0 adds an AUTH packet that enables SASL-style challenge-response authenti
 The Will message in MQTT 5.0 has a `Will Delay Interval` property. When a session expires, the broker MUST wait `Will Delay Interval` seconds before publishing the Will, unless the session expires first (in which case the Will is published at session expiry time, whichever is sooner).
 
 **Scope:**
-- Store Will Delay Interval from Will Properties on the Session.
-- After a client disconnects (without sending DISCONNECT `0x00`), schedule Will publication with the delay.
-- If the session expires before the delay elapses, publish immediately.
-- If the client reconnects before the delay elapses, cancel the Will.
+- [ ] Store Will Delay Interval from Will Properties on the Session.
+- [ ] After a client disconnects (without sending DISCONNECT `0x00`), schedule Will publication with the delay.
+- [ ] If the session expires before the delay elapses, publish immediately.
+- [ ] If the client reconnects before the delay elapses, cancel the Will.
 
 **Acceptance criteria:**
-- Will is published after the configured delay on ungraceful disconnect.
-- Will is cancelled if client reconnects before delay.
-- Will is published immediately if session expiry occurs before delay.
+- [ ] Will is published after the configured delay on ungraceful disconnect.
+- [ ] Will is cancelled if client reconnects before delay.
+- [ ] Will is published immediately if session expiry occurs before delay.
 
 ---
 
@@ -634,16 +634,16 @@ The Will message in MQTT 5.0 has a `Will Delay Interval` property. When a sessio
 A PUBLISH message in MQTT 5.0 can carry a `Message Expiry Interval` (seconds). The broker must not deliver the message to a subscriber if the interval has elapsed.
 
 **Scope:**
-- Store message receive timestamp and expiry interval on `ApplicationMessage`.
-- When delivering a queued message to a subscriber, check if `now > received_at + expiry_interval`.
-- If expired: discard the message silently.
-- When forwarding to a subscriber, set the `Message Expiry Interval` property in the PUBLISH to the **remaining** time (`original_expiry - elapsed`).
-- Retained messages also expire.
+- [ ] Store message receive timestamp and expiry interval on `ApplicationMessage`.
+- [ ] When delivering a queued message to a subscriber, check if `now > received_at + expiry_interval`.
+- [ ] If expired: discard the message silently.
+- [ ] When forwarding to a subscriber, set the `Message Expiry Interval` property in the PUBLISH to the **remaining** time (`original_expiry - elapsed`).
+- [ ] Retained messages also expire.
 
 **Acceptance criteria:**
-- Message with 1-second expiry is not delivered to an offline client that reconnects after 2 seconds.
-- Message with 60-second expiry delivered to an online client carries the reduced remaining interval.
-- Retained message with expired interval is discarded and not sent to new subscribers.
+- [ ] Message with 1-second expiry is not delivered to an offline client that reconnects after 2 seconds.
+- [ ] Message with 60-second expiry delivered to an online client carries the reduced remaining interval.
+- [ ] Retained message with expired interval is discarded and not sent to new subscribers.
 
 ---
 
@@ -655,13 +655,13 @@ A PUBLISH message in MQTT 5.0 can carry a `Message Expiry Interval` (seconds). T
 A broker can redirect a client to another server using the `Server Reference` property in CONNACK (reject at connect time) or DISCONNECT (redirect an established session).
 
 **Scope:**
-- Add `server_reference` field to broker config (optional).
-- If set, include `Server Reference` in CONNACK or DISCONNECT Properties for v5 clients.
-- Expose a broker API: `broker.redirect_client(client_id, server_reference, reason_code=0x9C)`.
+- [ ] Add `server_reference` field to broker config (optional).
+- [ ] If set, include `Server Reference` in CONNACK or DISCONNECT Properties for v5 clients.
+- [ ] Expose a broker API: `broker.redirect_client(client_id, server_reference, reason_code=0x9C)`.
 
 **Acceptance criteria:**
-- Broker configured with a server reference sends it in CONNACK when rejecting.
-- `redirect_client()` sends DISCONNECT with Server Reference to a connected v5 client.
+- [ ] Broker configured with a server reference sends it in CONNACK when rejecting.
+- [ ] `redirect_client()` sends DISCONNECT with Server Reference to a connected v5 client.
 
 ---
 
@@ -677,16 +677,16 @@ A broker can redirect a client to another server using the `Server Reference` pr
 Expose MQTT 5.0 CONNECT properties in the `MQTTClient` API.
 
 **Scope:**
-- Add `mqtt_version: int = 4` to client config (4 = 3.1.1, 5 = MQTT 5.0).
-- When `mqtt_version=5`, build v5 CONNECT packet with supported properties.
-- Expose config keys: `session_expiry_interval`, `receive_maximum`, `maximum_packet_size`, `topic_alias_maximum`, `user_properties`, `authentication_method`, `authentication_data`.
-- Read CONNACK Properties and store broker-reported limits on the session.
+- [ ] Add `mqtt_version: int = 4` to client config (4 = 3.1.1, 5 = MQTT 5.0).
+- [ ] When `mqtt_version=5`, build v5 CONNECT packet with supported properties.
+- [ ] Expose config keys: `session_expiry_interval`, `receive_maximum`, `maximum_packet_size`, `topic_alias_maximum`, `user_properties`, `authentication_method`, `authentication_data`.
+- [ ] Read CONNACK Properties and store broker-reported limits on the session.
 
 **Acceptance criteria:**
-- `MQTTClient(config={"mqtt_version": 5}).connect(...)` sends a v5 CONNECT.
-- CONNACK Properties are accessible after connect: `client.session.broker_receive_maximum`, etc.
-- Default (`mqtt_version=4`) behavior is unchanged.
-- `MQTTClient`, `ClientConfig`, and any new v5 config dataclasses have Google-style docstrings on all new public fields so `mkdocstrings` renders them correctly in `docs/references/client.md` and `docs/references/client_config.md`.
+- [ ] `MQTTClient(config={"mqtt_version": 5}).connect(...)` sends a v5 CONNECT.
+- [ ] CONNACK Properties are accessible after connect: `client.session.broker_receive_maximum`, etc.
+- [ ] Default (`mqtt_version=4`) behavior is unchanged.
+- [ ] `MQTTClient`, `ClientConfig`, and any new v5 config dataclasses have Google-style docstrings on all new public fields so `mkdocstrings` renders them correctly in `docs/references/client.md` and `docs/references/client_config.md`.
 
 ---
 
@@ -698,15 +698,15 @@ Expose MQTT 5.0 CONNECT properties in the `MQTTClient` API.
 Expose MQTT 5.0 PUBLISH properties in `MQTTClient.publish()`.
 
 **Scope:**
-- Add optional parameters to `publish()`: `payload_format_indicator`, `message_expiry_interval`, `topic_alias`, `response_topic`, `correlation_data`, `user_properties`, `content_type`.
-- When the session is v5, include these as PUBLISH Properties.
-- Implement topic alias sending: if `topic_alias` is specified and the broker's `Topic Alias Maximum` > 0, map and send the alias.
-- Respect the broker's `Maximum Packet Size` — raise `MQTTError` if the encoded packet exceeds it.
+- [ ] Add optional parameters to `publish()`: `payload_format_indicator`, `message_expiry_interval`, `topic_alias`, `response_topic`, `correlation_data`, `user_properties`, `content_type`.
+- [ ] When the session is v5, include these as PUBLISH Properties.
+- [ ] Implement topic alias sending: if `topic_alias` is specified and the broker's `Topic Alias Maximum` > 0, map and send the alias.
+- [ ] Respect the broker's `Maximum Packet Size` — raise `MQTTError` if the encoded packet exceeds it.
 
 **Acceptance criteria:**
-- `client.publish("t", b"data", content_type="application/json", user_properties=[("key","val")])` sends correct wire bytes.
-- Topic alias is used in subsequent publishes to the same topic.
-- Publishing a packet exceeding broker's Maximum Packet Size raises an error before sending.
+- [ ] `client.publish("t", b"data", content_type="application/json", user_properties=[("key","val")])` sends correct wire bytes.
+- [ ] Topic alias is used in subsequent publishes to the same topic.
+- [ ] Publishing a packet exceeding broker's Maximum Packet Size raises an error before sending.
 
 ---
 
@@ -718,12 +718,12 @@ Expose MQTT 5.0 PUBLISH properties in `MQTTClient.publish()`.
 Expose MQTT 5.0 SUBSCRIBE options in `MQTTClient.subscribe()`.
 
 **Scope:**
-- Add `subscription_identifier: int | None`, `no_local: bool = False`, `retain_as_published: bool = False`, `retain_handling: int = 0`, `user_properties` to `subscribe()`.
-- Build SUBSCRIBE with Properties and per-topic `SubscriptionOptions`.
+- [ ] Add `subscription_identifier: int | None`, `no_local: bool = False`, `retain_as_published: bool = False`, `retain_handling: int = 0`, `user_properties` to `subscribe()`.
+- [ ] Build SUBSCRIBE with Properties and per-topic `SubscriptionOptions`.
 
 **Acceptance criteria:**
-- `client.subscribe("topic", no_local=True, subscription_identifier=7)` sends correct wire bytes.
-- Subscription identifier is echoed back in received PUBLISH Properties.
+- [ ] `client.subscribe("topic", no_local=True, subscription_identifier=7)` sends correct wire bytes.
+- [ ] Subscription identifier is echoed back in received PUBLISH Properties.
 
 ---
 
@@ -735,14 +735,14 @@ Expose MQTT 5.0 SUBSCRIBE options in `MQTTClient.subscribe()`.
 Incoming PUBLISH messages in v5 carry Properties. The client's `deliver_message()` flow should expose these.
 
 **Scope:**
-- Extend `ApplicationMessage` with a `properties: Properties | None` field.
-- When delivering a v5 PUBLISH, populate `message.properties`.
-- Update `deliver_message()` return type / docs.
+- [ ] Extend `ApplicationMessage` with a `properties: Properties | None` field.
+- [ ] When delivering a v5 PUBLISH, populate `message.properties`.
+- [ ] Update `deliver_message()` return type / docs.
 
 **Acceptance criteria:**
-- Received message from a v5 broker has `message.properties` with correct fields populated.
-- Accessing properties on a v3-received message returns `None` safely.
-- `ApplicationMessage.properties` has a docstring; `docs/references/common.md` notes its presence and type for v5 messages.
+- [ ] Received message from a v5 broker has `message.properties` with correct fields populated.
+- [ ] Accessing properties on a v3-received message returns `None` safely.
+- [ ] `ApplicationMessage.properties` has a docstring; `docs/references/common.md` notes its presence and type for v5 messages.
 
 ---
 
@@ -754,14 +754,14 @@ Incoming PUBLISH messages in v5 carry Properties. The client's `deliver_message(
 The client needs to handle the AUTH packet exchange for extended authentication.
 
 **Scope:**
-- Read `Authentication Method` / `Authentication Data` from CONNACK.
-- Handle AUTH `0x18 Continue Authentication` from broker: invoke a user-supplied callback with the auth data; send AUTH `0x18` reply with the response data.
-- The callback interface: `auth_callback(method: str, data: bytes) -> bytes`.
-- Re-authentication: expose `client.reauthenticate(auth_data: bytes)` which sends AUTH `0x19`.
+- [ ] Read `Authentication Method` / `Authentication Data` from CONNACK.
+- [ ] Handle AUTH `0x18 Continue Authentication` from broker: invoke a user-supplied callback with the auth data; send AUTH `0x18` reply with the response data.
+- [ ] The callback interface: `auth_callback(method: str, data: bytes) -> bytes`.
+- [ ] Re-authentication: expose `client.reauthenticate(auth_data: bytes)` which sends AUTH `0x19`.
 
 **Acceptance criteria:**
-- Client with an `auth_callback` can complete a two-round challenge with a broker implementing Issue #022.
-- `reauthenticate()` triggers the flow and returns when the broker sends CONNACK or AUTH success.
+- [ ] Client with an `auth_callback` can complete a two-round challenge with a broker implementing Issue #022.
+- [ ] `reauthenticate()` triggers the flow and returns when the broker sends CONNACK or AUTH success.
 
 ---
 
@@ -773,14 +773,14 @@ The client needs to handle the AUTH packet exchange for extended authentication.
 In MQTT 5.0, the broker may send DISCONNECT. The client must handle this gracefully.
 
 **Scope:**
-- In the client protocol handler, detect incoming DISCONNECT packet.
-- Raise or propagate a `ServerDisconnectedError` with the reason code and reason string.
-- Expose the disconnect reason on the client for inspection after reconnect.
-- If reason code is `0x9C Use Another Server` or `0x9D Server Moved`, extract and expose `Server Reference`.
+- [ ] In the client protocol handler, detect incoming DISCONNECT packet.
+- [ ] Raise or propagate a `ServerDisconnectedError` with the reason code and reason string.
+- [ ] Expose the disconnect reason on the client for inspection after reconnect.
+- [ ] If reason code is `0x9C Use Another Server` or `0x9D Server Moved`, extract and expose `Server Reference`.
 
 **Acceptance criteria:**
-- Client receives server DISCONNECT and raises a typed exception with reason code.
-- `client.last_disconnect_reason` is accessible after the event.
+- [ ] Client receives server DISCONNECT and raises a typed exception with reason code.
+- [ ] `client.last_disconnect_reason` is accessible after the event.
 
 ---
 
@@ -794,9 +794,9 @@ In MQTT 5.0, the broker may send DISCONNECT. The client must handle this gracefu
 Run the amqtt v5 client against a real Mosquitto 2.x broker (which has solid MQTT 5.0 support) to validate wire compatibility.
 
 **Scope:**
-- Add CI job that spins up a Mosquitto 2.x container.
-- Run a set of v5 scenarios: connect with session expiry, publish with content-type, subscribe with no-local, shared subscription, topic alias.
-- All scenarios must pass without protocol errors.
+- [ ] Add CI job that spins up a Mosquitto 2.x container.
+- [ ] Run a set of v5 scenarios: connect with session expiry, publish with content-type, subscribe with no-local, shared subscription, topic alias.
+- [ ] All scenarios must pass without protocol errors.
 
 ---
 
@@ -806,8 +806,8 @@ Run the amqtt v5 client against a real Mosquitto 2.x broker (which has solid MQT
 Verify that a MQTT 3.1.1 client can connect to the v5-capable amqtt broker and exchange messages normally.
 
 **Scope:**
-- Existing v3 integration tests must pass against the updated broker unchanged.
-- Add explicit cross-version test: v3 client publishes, v5 client subscribes (and vice-versa).
+- [ ] Existing v3 integration tests must pass against the updated broker unchanged.
+- [ ] Add explicit cross-version test: v3 client publishes, v5 client subscribes (and vice-versa).
 
 ---
 
@@ -819,8 +819,8 @@ Verify that a MQTT 3.1.1 client can connect to the v5-capable amqtt broker and e
 The `BrokerSysPlugin` publishes diagnostics to `$SYS/#`. Add v5-specific stats.
 
 **Scope:**
-- Add `$SYS/broker/clients/v5` — count of connected MQTT 5.0 clients.
-- Add `$SYS/broker/version` — report protocol versions supported.
+- [ ] Add `$SYS/broker/clients/v5` — count of connected MQTT 5.0 clients.
+- [ ] Add `$SYS/broker/version` — report protocol versions supported.
 
 ---
 
@@ -864,10 +864,10 @@ Create new documentation pages and update existing ones to cover MQTT 5.0 suppor
 - **`mkdocs.yml`** nav: add `MQTT 5.0: mqtt5.md` as a top-level nav entry and `References > MQTT 5.0 API: references/mqtt5.md`.
 
 **Acceptance criteria:**
-- `mkdocs build` completes with no warnings about missing pages or broken `:::` directives.
-- `docs/mqtt5.md` includes working code examples for at least: v5 connect, v5 publish with `content_type`, v5 subscribe with `no_local`, and the request/response pattern.
-- All `:::` directives in `docs/references/mqtt5.md` render non-empty content (requires docstrings in the mqtt5 classes).
-- `docs/quickstart.md` no longer describes the broker as "MQTT 3.1.1 only".
+- [ ] `mkdocs build` completes with no warnings about missing pages or broken `:::` directives.
+- [ ] `docs/mqtt5.md` includes working code examples for at least: v5 connect, v5 publish with `content_type`, v5 subscribe with `no_local`, and the request/response pattern.
+- [ ] All `:::` directives in `docs/references/mqtt5.md` render non-empty content (requires docstrings in the mqtt5 classes).
+- [ ] `docs/quickstart.md` no longer describes the broker as "MQTT 3.1.1 only".
 
 ---
 
@@ -879,9 +879,9 @@ Create new documentation pages and update existing ones to cover MQTT 5.0 suppor
 Appendix B of the spec lists every MUST/MUST NOT statement as a numbered checklist. Create a tracking document mapping each statement to the issue or code location that implements it, and identify any gaps.
 
 **Scope:**
-- Enumerate all ~200+ normative statements from Appendix B.
-- For each: `implemented in issue #NNN / file:line` or `NOT YET IMPLEMENTED`.
-- File follow-up issues for any gaps found.
+- [ ] Enumerate all ~200+ normative statements from Appendix B.
+- [ ] For each: `implemented in issue #NNN / file:line` or `NOT YET IMPLEMENTED`.
+- [ ] File follow-up issues for any gaps found.
 
 ---
 
