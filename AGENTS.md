@@ -207,6 +207,8 @@ Use this layering unless an issue explicitly says otherwise:
 6. MQTT 5 protocol handlers
    - Add version-aware protocol dispatch.
    - Keep MQTT 3.1.1 paths stable.
+   - Follow the broker version-branching strategy documented in `ISSUES.md` Issue #013: branch at protocol boundaries, normalize into broker-internal objects, and avoid scattering `session.mqtt_version` checks through broker business logic.
+   - If the shared `ProtocolHandler` is moved out of `amqtt/mqtt3/protocol/handler.py`, place the shared base under a new top-level `amqtt/protocol/` package. Do not use `amqtt/mqtt/protocol/`; `amqtt/mqtt/` is a deprecated compatibility shim to `amqtt.mqtt3`.
 
 7. `session.py`
    - Add negotiated MQTT version and MQTT 5 session state.

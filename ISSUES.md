@@ -404,6 +404,52 @@ The broker's `mqtt_connect()` method currently hard-codes protocol level 4. It n
 - [ ] v3.1.1 path must be unchanged in behavior.
 - [ ] **Version-aware packet dispatch**: after CONNECT, every call to `read_packet()` (or equivalent) must produce the correct v3 or v5 packet class based on `session.mqtt_version`. The two options are: (a) a single dispatcher that checks the fixed-header type byte and delegates to the right module, or (b) two separate handler subclasses that each call their own packet factories. Decide and document the approach here; all Phase 1 packet classes must conform to it. The chosen approach also determines whether `from_stream()` classmethods are version-agnostic (option a) or each handler calls its own module directly (option b).
 
+#### Broker version-branching strategy
+
+Keep MQTT version checks at protocol boundaries instead of spreading `if session.mqtt_version == 5` throughout broker business logic.
+
+- CONNECT negotiation chooses v3/v5 parsing and stores `session.mqtt_version`.
+- Reader dispatch chooses the v3 or v5 packet factory based on `session.mqtt_version`.
+- Writer methods such as `mqtt_connack_authorize()`, `mqtt_acknowledge_subscription()`, `mqtt_publish()`, and `mqtt_disconnect()` build v3 or v5 packets at send time.
+- Broker core logic should operate on normalized internal objects such as `Session`, `Subscription`, `UnSubscription`, and `ApplicationMessage`.
+
+For v5-only data, extend broker-internal models with v3-equivalent defaults rather than passing raw v5 packet classes through routing, authentication, retained-message, or session-takeover code. Examples include subscription options, subscription identifiers, message expiry, topic aliases, and reason-code/properties fields on acknowledgements.
+
+If `amqtt/mqtt3/protocol/handler.py::ProtocolHandler` is refactored into a shared base, move shared code to a new top-level `amqtt/protocol/` package. Do **not** use `amqtt/mqtt/protocol/` for shared MQTT 3/5 code: `amqtt/mqtt/` is a deprecated compatibility shim that aliases to `amqtt.mqtt3`, and new shared code there would conflict with the shim's backwards-compatibility contract.
+
+#### Broker protocol-handler facade
+
+The broker should ask the protocol handler to perform protocol actions instead of checking the MQTT version and building packets itself. Add or formalize handler methods that hide v3/v5 packet differences behind broker-level operations:
+
+- `accept_connection(session_present: bool)`: send the correct v3 or v5 CONNACK for an accepted connection.
+- `reject_connection(reason, reason_string: str | None = None)`: send the correct CONNACK rejection packet and close when appropriate.
+- `acknowledge_subscription(packet_id: int, results: list[SubscriptionResult])`: send v3 SUBACK return codes or v5 SUBACK reason codes/properties.
+- `acknowledge_unsubscription(packet_id: int, results: list[UnsubscribeResult] | None = None)`: send v3 UNSUBACK or v5 UNSUBACK with per-topic reason codes.
+- `publish_application_message(message: ApplicationMessage, options: PublishDeliveryOptions | None = None)`: build the correct outbound PUBLISH packet and manage QoS flow.
+- `disconnect_client(reason, reason_string: str | None = None)`: close or send DISCONNECT using the protocol rules for the negotiated version.
+
+Use small broker-internal DTOs for data that crosses from packet parsing into broker logic. Existing `Subscription` and `UnSubscription` can evolve in this direction:
+
+```python
+@dataclass
+class SubscriptionRequest:
+    packet_id: int
+    topics: list[SubscriptionTopic]
+    properties: Properties | None = None
+
+
+@dataclass
+class SubscriptionTopic:
+    topic_filter: str
+    max_qos: int
+    no_local: bool = False
+    retain_as_published: bool = False
+    retain_handling: int = 0
+    subscription_identifier: int | None = None
+```
+
+For MQTT 3.1.1, DTO defaults must match current behavior. Prefer helper methods such as `Session.is_clean_on_disconnect()` and handler-level packet builders over broker-side version checks. `ApplicationMessage.build_publish_packet()` currently hard-codes `mqtt3.PublishPacket`; before full v5 publish support, move packet construction behind the protocol handler or make it version-aware at the protocol boundary.
+
 **Acceptance criteria:**
 - [ ] A v5 client can complete a CONNECT/CONNACK handshake with the broker.
 - [ ] A client sending an unknown protocol level (e.g. 3 or 6) is refused cleanly.
