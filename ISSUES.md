@@ -4,6 +4,34 @@ This file contains the full breakdown of work required to implement MQTT 5.0 sup
 
 Spec reference throughout: https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html
 
+## Public Issue Labeling
+
+When mirroring this roadmap to GitHub, use labels instead of encoding scope in titles.
+
+- `mqtt5` for every MQTT 5 issue.
+- `amqtt-core` for shared foundation work and packet-layer issues that are not broker-only or client-only.
+- `amqtt-broker` for broker protocol, routing, session, and server-side behavior.
+- `amqtt-client` for client API, negotiation, and client-side enforcement.
+
+Keep GitHub issue titles short and descriptive. Keep the detailed implementation notes, dependency graph, and acceptance criteria here in `ISSUES.md`. Add the GitHub issue number as metadata if desired, but do not renumber the local roadmap.
+When a public GitHub issue is created, add its number to the mapping table and annotate the matching local issue entry.
+This roadmap assumes `mqtt5/main` is the integration branch for reviewable MQTT 5 work.
+The upcoming `mqtt -> mqtt3` release branch should absorb the shared protocol-handler refactor first: move version-neutral handler code to `amqtt/protocol/`, keep `amqtt/mqtt3/protocol/handler.py` as a compatibility wrapper, and avoid MQTT 5 packet dispatch changes in that release.
+
+## GitHub Mapping
+
+| Local | GitHub | Status |
+|---|---|---|
+| `#001` | `#324` | created |
+| `#002` | `#328` | created |
+| `#003` | `#326` | created |
+| `#003b` | `#330` | created |
+| `#004` | `#329` | created |
+| `#005` | `#327` | created |
+| `#013` | `#325` | created |
+
+Add rows here as public GitHub issues are created. Keep the local numbering stable.
+
 ---
 
 ## Testing Conventions
@@ -100,6 +128,8 @@ Before starting any Phase 0 issue, read the stubs to understand what scaffolding
 
 ### Issue #001 [MQTT5-CORE] — Properties subsystem: encoding and decoding
 
+GitHub: `#324`
+
 **Spec:** §2.2.2, Appendix B (property table)
 
 **Summary:**
@@ -125,6 +155,8 @@ MQTT 5.0 adds a structured Properties section to every packet type. This issue i
 
 ### Issue #002 [MQTT5-CORE] — Reason codes: enum and wire encoding
 
+GitHub: `#328`
+
 **Spec:** §2.4, Table 2-6
 
 **Summary:**
@@ -148,6 +180,8 @@ MQTT 5.0 replaces the limited CONNACK return codes with a unified 1-byte Reason 
 
 ### Issue #003 [MQTT5-CORE] — Session: add MQTT version and v5 state fields
 
+GitHub: `#326`
+
 **Spec:** §3.1.4, §4.1
 
 **Summary:**
@@ -170,6 +204,8 @@ The `Session` class needs to carry the negotiated protocol version and v5-specif
 ---
 
 ### Issue #003b [MQTT5-CORE] — Test infrastructure for mqtt5
+
+GitHub: `#330`
 
 **Summary:**
 Create the `tests/mqtt5/` directory structure and shared fixtures before any Phase 1 packet tests are written. This prevents each issue from independently inventing incompatible helpers.
@@ -216,6 +252,8 @@ One issue per packet type that changes in MQTT 5.0. All issues in this phase are
 
 ### Issue #004 [MQTT5-CORE] — CONNECT packet v5 support
 
+GitHub: `#329`
+
 **Spec:** §3.1
 
 **Changes from v3.1.1:**
@@ -238,6 +276,8 @@ One issue per packet type that changes in MQTT 5.0. All issues in this phase are
 ---
 
 ### Issue #005 [MQTT5-CORE] — CONNACK packet v5 support
+
+GitHub: `#327`
 
 **Spec:** §3.2
 
@@ -391,6 +431,8 @@ AUTH is a new packet type (`0x0F`) used for extended authentication (challenge-r
 ---
 
 ### Issue #013 [MQTT5-BROKER] — Version negotiation in BrokerProtocolHandler
+
+GitHub: `#325`
 
 **Spec:** §3.1.2.2, §3.1.4
 
@@ -1099,3 +1141,20 @@ Minimum viable path for a first working demo:
 `#001 → #002 → #003 → #004 → #005 → #006 → #013 → #014 → #026 → #027`
 
 This gives you a broker and client that can connect, publish, and subscribe over MQTT 5.0 with basic properties support.
+
+Minimum viable broker path using Paho MQTT as the initial test client:
+
+1. **Paho CONNECT/CONNACK handshake only:**
+   `#001 → #002 → #003 → #003b → #004 → #005 → #013`
+
+   This lets an external Paho MQTT 5 client complete `connect()` against the broker. Keep the implementation scoped to v5 CONNECT parsing, v5 CONNACK success/rejection writing, session version storage, and broker-side version negotiation. `#014` CONNACK capability properties are not required for the first handshake if the broker sends a valid empty CONNACK Properties section.
+
+2. **Paho QoS 0 publish/subscribe broker demo:**
+   `#001 → #002 → #003 → #003a → #003b → #004 → #005 → #006 → #008 → #009 → #011 → #013 → #014`
+
+   This lets Paho MQTT 5 clients connect, subscribe, publish QoS 0 messages, receive routed messages, and disconnect cleanly. It intentionally skips the amqtt MQTT 5 client issues (`#026–#031a`) because Paho is the test vehicle. It also skips QoS 1/2 acknowledgements until `#007` is implemented.
+
+3. **Paho QoS 1/2 broker demo:**
+   Add `#007` after the QoS 0 path.
+
+   This enables v5 PUBACK/PUBREC/PUBREL/PUBCOMP handling for Paho clients publishing or receiving QoS 1/2 messages.

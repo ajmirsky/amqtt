@@ -11,6 +11,8 @@ This file gives coding agents the project context and operating rules needed to 
 - Python target: 3.10–3.13
 - Style: asyncio-native, type-annotated, plugin-extensible
 
+Yakifo/amqtt is the public issue-tracking source only. Do not push code to that repo under any circumstance.
+
 ## How Agents Should Work
 
 Before making changes:
@@ -26,9 +28,19 @@ When implementing work:
 - Prefer small, reviewable changes tied to a single issue.
 - Keep public API changes additive.
 - Add tests with every feature or behavior change.
+- If you create a public GitHub issue for roadmap tracking, update `ISSUES.md` with the GitHub number in the mapping table and the corresponding local issue entry.
 - Use spec section comments for non-obvious MQTT 5.0 behavior.
 - Do not introduce new dependencies without discussion.
 - Do not silently skip acceptance criteria.
+
+Branching policy for MQTT 5 work:
+
+- Treat `mqtt5/main` as the integration branch for MQTT 5 development.
+- Create short-lived feature branches from `mqtt5/main`, not from `main`.
+- Keep pull requests targeted at `mqtt5/main`.
+- Scope each pull request to one roadmap issue, or one tightly coupled pair if a split would be artificial.
+- Rebase feature branches onto the latest `mqtt5/main` before review so diffs stay readable.
+- Keep `main` as the product branch until the MQTT 5 track is ready for a controlled merge back.
 
 When finishing work:
 
@@ -209,6 +221,7 @@ Use this layering unless an issue explicitly says otherwise:
    - Keep MQTT 3.1.1 paths stable.
    - Follow the broker version-branching strategy documented in `ISSUES.md` Issue #013: branch at protocol boundaries, normalize into broker-internal objects, and avoid scattering `session.mqtt_version` checks through broker business logic.
    - If the shared `ProtocolHandler` is moved out of `amqtt/mqtt3/protocol/handler.py`, place the shared base under a new top-level `amqtt/protocol/` package. Do not use `amqtt/mqtt/protocol/`; `amqtt/mqtt/` is a deprecated compatibility shim to `amqtt.mqtt3`.
+   - Use the Paho MQTT client only as a runtime interoperability test vehicle. Do not use Paho code as an implementation reference for amqtt MQTT 5 behavior.
 
 7. `session.py`
    - Add negotiated MQTT version and MQTT 5 session state.
