@@ -28,7 +28,9 @@ The upcoming `mqtt -> mqtt3` release branch should absorb the shared protocol-ha
 | `#003b` | `#330` | created |
 | `#004` | `#329` | created |
 | `#005` | `#327` | created |
+| `#006` | `#342` | created |
 | `#013` | `#325` | created |
+| `#014` | `#343` | created |
 
 Add rows here as public GitHub issues are created. Keep the local numbering stable.
 
@@ -264,14 +266,14 @@ GitHub: `#329`
 - Password field is now binary data (arbitrary bytes, not a string).
 
 **Scope:**
-- [ ] Extend existing `ConnectPacket` (or add `ConnectV5Packet`) to parse and produce v5 CONNECT packets.
-- [ ] Implement Will Properties decode/encode.
-- [ ] Implement CONNECT Properties decode/encode.
+- [x] Extend existing `ConnectPacket` (or add `ConnectV5Packet`) to parse and produce v5 CONNECT packets.
+- [x] Implement Will Properties decode/encode.
+- [x] Implement CONNECT Properties decode/encode.
 
 **Acceptance criteria:**
-- [ ] Can parse raw bytes of a known-good v5 CONNECT packet (from spec example or captured traffic).
-- [ ] Can encode a v5 CONNECT packet and decode it back with identical fields (round-trip).
-- [ ] v3.1.1 CONNECT parsing is unaffected.
+- [x] Can parse raw bytes of a known-good v5 CONNECT packet (from spec example or captured traffic).
+- [x] Can encode a v5 CONNECT packet and decode it back with identical fields (round-trip).
+- [x] v3.1.1 CONNECT parsing is unaffected.
 
 ---
 
@@ -286,16 +288,18 @@ GitHub: `#327`
 - New CONNACK Properties section (§3.2.2.3): Session Expiry Interval, Receive Maximum, Maximum QoS, Retain Available, Maximum Packet Size, Assigned Client Identifier, Topic Alias Maximum, Reason String, User Properties, Wildcard Subscription Available, Subscription Identifiers Available, Shared Subscription Available, Server Keep Alive, Response Information, Server Reference, Authentication Method, Authentication Data.
 
 **Scope:**
-- [ ] Extend `ConnackPacket` to produce and parse v5 CONNACK with Properties.
-- [ ] `ConnackPacket.build()` must accept a `ReasonCode` and optional `Properties`.
+- [x] Extend `ConnackPacket` to produce and parse v5 CONNACK with Properties.
+- [x] `ConnackPacket.build()` must accept a `ReasonCode` and optional `Properties`.
 
 **Acceptance criteria:**
-- [ ] Round-trip test with at least: Reason Code, Assigned Client Identifier, Session Expiry Interval, Reason String.
-- [ ] v3.1.1 CONNACK unaffected.
+- [x] Round-trip test with at least: Reason Code, Assigned Client Identifier, Session Expiry Interval, Reason String.
+- [x] v3.1.1 CONNACK unaffected.
 
 ---
 
 ### Issue #006 [MQTT5-CORE] — PUBLISH packet v5 support
+
+GitHub: `#342`
 
 **Spec:** §3.3
 
@@ -459,6 +463,14 @@ For v5-only data, extend broker-internal models with v3-equivalent defaults rath
 
 If `amqtt/mqtt3/protocol/handler.py::ProtocolHandler` is refactored into a shared base, move shared code to a new top-level `amqtt/protocol/` package. Do **not** use `amqtt/mqtt/protocol/` for shared MQTT 3/5 code: `amqtt/mqtt/` is a deprecated compatibility shim that aliases to `amqtt.mqtt3`, and new shared code there would conflict with the shim's backwards-compatibility contract.
 
+Use a three-layer handler split:
+
+- `ProtocolHandlerBase` for shared transport and lifecycle behavior.
+- `BrokerProtocolHandlerBase` for broker-facing facade methods such as connection negotiation, acknowledgements, publish routing, and disconnect handling.
+- `ClientProtocolHandlerBase` for client-facing facade methods such as connect, publish, subscribe, unsubscribe, ping, and disconnect flows.
+
+Concrete MQTT 3 and MQTT 5 handlers should inherit from the appropriate broker or client base and keep MQTT-version branching inside those handlers. Broker and client business logic should call the facade methods instead of checking `session.mqtt_version` directly. For the first refactor pass, only shared protocol-engine behavior should move; packet-specific dispatch and MQTT 5 semantics stay in the concrete handlers.
+
 #### Broker protocol-handler facade
 
 The broker should ask the protocol handler to perform protocol actions instead of checking the MQTT version and building packets itself. Add or formalize handler methods that hide v3/v5 packet differences behind broker-level operations:
@@ -495,12 +507,15 @@ For MQTT 3.1.1, DTO defaults must match current behavior. Prefer helper methods 
 **Acceptance criteria:**
 - [ ] A v5 client can complete a CONNECT/CONNACK handshake with the broker.
 - [ ] A client sending an unknown protocol level (e.g. 3 or 6) is refused cleanly.
+- [ ] The negotiated session records `mqtt_version=5` for MQTT 5 clients and preserves `mqtt_version=4` for MQTT 3.1.1 clients.
 - [ ] Existing v3 integration tests still pass.
-- [ ] A v5 PUBLISH received after CONNECT is decoded as a `mqtt5.PublishPacket`, not `mqtt3.PublishPacket`.
+- [ ] No publish/subscribe end-to-end flow is required for this ticket; v5 post-CONNECT packet dispatch is tested with the packet/handler tickets that introduce those packet classes.
 
 ---
 
 ### Issue #014 [MQTT5-BROKER] — CONNACK v5 properties on successful connect
+
+GitHub: `#343`
 
 **Spec:** §3.2.2.3
 

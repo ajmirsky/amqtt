@@ -443,6 +443,13 @@ Do not silently close v5 connections when the spec calls for a reason code.
 
 Every non-obvious MQTT 5 implementation decision must cite the spec section in a comment.
 
+Local searchable copies of the MQTT specs are available for targeted lookup:
+
+- `.agents/specs/mqtt-v3.1.1-os.html`
+- `.agents/specs/mqtt-v5.0-os.html`
+
+Do not load these files into context at session start. They are large and should only be searched or read when a specific spec citation, packet rule, or conformance statement is needed. Prefer targeted `rg` searches for conformance IDs or section names, then read only the relevant surrounding lines.
+
 Use this format:
 
 ```python
