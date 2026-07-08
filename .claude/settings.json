@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ROOT=$(git rev-parse --show-toplevel) && AGENT_TURN_LOG=$ROOT/.agents/turn_log.jsonl python3 $ROOT/.agents/scripts/agent_log_turn.py"
+          }
+        ]
+      }
+    ]
+  }
+}
