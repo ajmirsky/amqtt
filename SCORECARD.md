@@ -2,16 +2,29 @@
 
 Baseline run: 2026-07-08
 
+Latest public rerun: 2026-07-08 20:10 EDT against `source/main`
+commit `31995b2feaa60fbfc918a2040685fc0a2126391b`.
+
 Aggregate score: 5.4 / 10
 
 This file tracks the work needed to improve the OpenSSF Scorecard result for
 `Yakifo/amqtt`. Prefer small pull requests and rerun Scorecard after each
 completed section.
 
+The public Scorecard result still reflects `source/main`. Local branch
+`openssf` contains remediation commits that are not reflected in the public
+score until they are merged into the upstream default branch.
+
 ## Run Scorecard
 
 ```bash
 scorecard --repo=github.com/Yakifo/amqtt --show-details
+```
+
+Use an authenticated run to avoid GitHub API rate limits:
+
+```bash
+GITHUB_AUTH_TOKEN="$(gh auth token)" scorecard --repo=github.com/Yakifo/amqtt --show-details
 ```
 
 Local mode may fail if it scans `.venv`; use the GitHub-backed run as the
@@ -21,7 +34,7 @@ authoritative project score.
 
 ### Branch Protection
 
-Current score: 0 / 10
+Current public score: 0 / 10
 
 Reason: branch protection is not enabled on development/release branches.
 
@@ -36,65 +49,76 @@ Reason: branch protection is not enabled on development/release branches.
 
 ### Token Permissions
 
-Current score: 0 / 10
+Current public score: 0 / 10
 
 Reason: GitHub workflow tokens have excessive permissions.
 
-- [ ] Add restrictive top-level permissions to `.github/workflows/ci.yml`.
-- [ ] Add restrictive top-level permissions to `.github/workflows/codeql-analysis.yml`.
-- [ ] Keep `.github/workflows/scorecard.yml` on restrictive top-level permissions.
-- [ ] Use job-level write permissions only where required, such as `security-events: write`.
-- [ ] Confirm no workflow has implicit broad token permissions.
-- [ ] Rerun Scorecard and record the new score.
+- [x] Add restrictive top-level permissions to `.github/workflows/ci.yml`.
+- [x] Add restrictive top-level permissions to `.github/workflows/codeql-analysis.yml`.
+- [x] Keep `.github/workflows/scorecard.yml` on restrictive top-level permissions.
+- [x] Use job-level write permissions only where required, such as `security-events: write`.
+- [x] Confirm no workflow has implicit broad token permissions.
+- [ ] Rerun Scorecard after these changes are merged to `source/main`.
 
 ### Pinned Dependencies
 
-Current score: 0 / 10
+Current public score: 0 / 10
 
 Reason: dependencies are not pinned by hash or immutable digest.
 
-- [ ] Pin all GitHub Actions in `.github/workflows/ci.yml` by full commit SHA.
-- [ ] Pin all GitHub Actions in `.github/workflows/codeql-analysis.yml` by full commit SHA.
-- [ ] Pin all GitHub Actions in `.github/workflows/scorecard.yml` by full commit SHA.
-- [ ] Pin `Dockerfile` base images by digest.
-- [ ] Replace or pin `pip install uv` in `Dockerfile`.
-- [ ] Keep generated `requirements.txt` with hashes up to date.
-- [ ] Keep the CI check that verifies `requirements.txt` matches `pyproject.toml`.
-- [ ] Rerun Scorecard and record the new score.
+Local status: local Scorecard reports 10 / 10 for Pinned-Dependencies after
+pinning GitHub Actions, container images, and pip install commands.
+
+- [x] Pin all GitHub Actions in `.github/workflows/ci.yml` by full commit SHA.
+- [x] Pin all GitHub Actions in `.github/workflows/codeql-analysis.yml` by full commit SHA.
+- [x] Pin all GitHub Actions in `.github/workflows/scorecard.yml` by full commit SHA.
+- [x] Pin `Dockerfile` base images by digest.
+- [x] Replace or pin `pip install uv` in `Dockerfile`.
+- [x] Use hash-checked pip installs in ClusterFuzzLite build integration.
+- [x] Keep generated `requirements.txt` with hashes up to date.
+- [x] Keep the CI check that verifies `requirements.txt` matches `pyproject.toml`.
+- [ ] Rerun Scorecard after these changes are merged to `source/main`.
 
 ### Vulnerabilities
 
-Current score: 0 / 10
+Current public score: 0 / 10
 
 Reason: Scorecard reported 103 existing vulnerabilities.
 
-- [ ] Run an advisory scanner against `pyproject.toml` and `uv.lock`.
-- [ ] Map each advisory to the vulnerable package and dependency group.
-- [ ] Update direct runtime dependencies first.
-- [ ] Update optional, docs, and dev dependencies next.
-- [ ] Regenerate `uv.lock`.
-- [ ] Regenerate hashed `requirements.txt`.
+Local status: `uv.lock` and `docs_test/package-lock.json` currently scan clean
+with OSV Scanner; `docs_test/package-lock.json` also passes `npm audit`.
+
+- [x] Run an advisory scanner against `pyproject.toml` and `uv.lock`.
+- [x] Map each advisory to the vulnerable package and dependency group.
+- [x] Update direct runtime dependencies first.
+- [x] Update optional, docs, and dev dependencies next.
+- [x] Regenerate `uv.lock`.
+- [x] Confirm hashed `requirements.txt` is up to date.
+- [x] Scan `docs_test/package-lock.json` with `npm audit` and OSV Scanner.
+- [x] Update vulnerable `docs_test` transitive dependencies.
+- [x] Run focused Python tests affected by dependency updates.
+- [x] Run `docs_test` production build.
 - [ ] Run the full test suite after dependency updates.
-- [ ] Rerun Scorecard and record the new score.
+- [ ] Rerun Scorecard after these changes are merged to `source/main`.
 
 ## Medium Impact
 
 ### Security Policy
 
-Current score: 4 / 10
+Current public score: 4 / 10
 
 Reason: a security policy exists, but it lacks linked/reporting details.
 
-- [ ] Update `SECURITY.md` with a private vulnerability reporting contact.
-- [ ] Document supported versions.
-- [ ] Document expected acknowledgement and remediation timelines.
-- [ ] Document coordinated disclosure expectations.
-- [ ] Link to `SECURITY.md` from `README.md`.
-- [ ] Rerun Scorecard and record the new score.
+- [x] Update `SECURITY.md` with a private vulnerability reporting contact.
+- [x] Document supported versions.
+- [x] Document expected acknowledgement and remediation timelines.
+- [x] Document coordinated disclosure expectations.
+- [x] Link to `SECURITY.md` from `README.md`.
+- [ ] Rerun Scorecard after these changes are merged to `source/main`.
 
 ### CII Best Practices
 
-Current score: 0 / 10
+Current public score: 0 / 10
 
 Reason: no OpenSSF Best Practices badge effort was detected.
 
@@ -105,22 +129,24 @@ Reason: no OpenSSF Best Practices badge effort was detected.
 
 ### Fuzzing
 
-Current score: 0 / 10
+Current public score: 0 / 10
 
 Reason: no recognized fuzzer integration was found.
 
-- [ ] Decide on a recognized fuzzing path, such as OSS-Fuzz or ClusterFuzzLite.
-- [ ] Add fuzz targets for MQTT packet parsing.
+- [x] Decide on a recognized fuzzing path, such as OSS-Fuzz or ClusterFuzzLite.
+- [x] Add fuzz targets for MQTT packet parsing.
+- [x] Add a recognized ClusterFuzzLite/Atheris fuzz target for MQTT packet parsing.
 - [ ] Add fuzz targets for MQTT 5 property decoding as that implementation lands.
-- [ ] Add CI coverage for fuzz target build or smoke tests.
-- [ ] Document how to run fuzz targets locally.
-- [ ] Rerun Scorecard and record the new score.
+- [x] Add CI coverage for fuzz target build or smoke tests.
+- [x] Document how to run fuzz targets locally.
+- [x] Confirm local Scorecard detects recognized fuzzing integration.
+- [ ] Rerun public Scorecard after ClusterFuzzLite integration lands on `source/main`.
 
 ## Longer Term
 
 ### Code Review
 
-Current score: 5 / 10
+Current public score: 5 / 10
 
 Reason: only 9 of 17 recent changesets were approved.
 
@@ -131,7 +157,7 @@ Reason: only 9 of 17 recent changesets were approved.
 
 ### CI Tests
 
-Current score: 8 / 10
+Current public score: 8 / 10
 
 Reason: 15 of 17 merged PRs were checked by CI.
 
@@ -142,13 +168,13 @@ Reason: 15 of 17 merged PRs were checked by CI.
 
 ### SAST
 
-Current score: 9 / 10
+Current public score: 9 / 10
 
 Reason: CodeQL is configured, but not all recent commits were checked.
 
-- [ ] Keep CodeQL running on pull requests.
-- [ ] Keep CodeQL running on pushes to protected branches.
-- [ ] Consider enabling the scheduled CodeQL run.
+- [x] Keep CodeQL running on pull requests.
+- [x] Keep CodeQL running on pushes to protected branches.
+- [x] Consider enabling the scheduled CodeQL run.
 - [ ] Require CodeQL in branch protection.
 - [ ] Rerun Scorecard after recent commits are covered.
 
@@ -186,8 +212,13 @@ These checks were already strong in the baseline run.
 
 ## Progress Log
 
-Add dated entries after each Scorecard rerun.
+Add dated entries after each Scorecard rerun or remediation batch.
 
 | Date | Aggregate | Notes |
 |---|---:|---|
+| 2026-07-08 | local Pinned-Dependencies 10 / 10 | Added hash-checked Docker build dependency install and hash-checked ClusterFuzzLite build dependency install. |
+| 2026-07-08 | local Fuzzing 10 / 10 | Added ClusterFuzzLite PR workflow, Python/Atheris MQTT packet fuzzer, and `.clusterfuzzlite` build integration; local Scorecard detects ClusterFuzzLite and PythonAtherisFuzzer. |
+| 2026-07-08 | local clean | Fixed `docs_test/package-lock.json` vulnerabilities; `npm audit` and OSV Scanner are clean, and `docs_test` build passes. |
+| 2026-07-08 | 5.4 / 10 | Authenticated GitHub-backed rerun against `source/main` commit `31995b2`; unchanged because local `openssf` branch remediations are not merged upstream. |
+| 2026-07-08 | local remediation | Completed local workflow hardening, action pinning, Docker pinning, security policy updates, local MQTT parser fuzz tests, dependency vulnerability updates, and scheduled CodeQL. |
 | 2026-07-08 | 5.4 / 10 | Baseline run before remediation work. |
