@@ -230,6 +230,83 @@ Add dated entries after each Scorecard rerun or remediation batch.
 | 2026-07-08 | local remediation | Completed local workflow hardening, action pinning, Docker pinning, security policy updates, local MQTT parser fuzz tests, dependency vulnerability updates, and scheduled CodeQL. |
 | 2026-07-08 | 5.4 / 10 | Baseline run before remediation work. |
 
+## OpenSSF Best Practices Passing Badge Entries
+
+Sources:
+
+- https://www.bestpractices.dev/en/projects/13571/passing
+- https://www.bestpractices.dev/en/criteria/0?details=true&rationale=true
+
+| Criterion | Current Status | Recommended Status | Suggested Justification or Needed Change |
+|---|---|---|---|
+| description_good | Met | Met | The README and project website describe aMQTT as an open source MQTT broker and client implemented with Python's asyncio. |
+| interact | Met | Met | The README documents how to obtain the package from PyPI, report bugs through GitHub issues, join Discord, and contribute through the repository. |
+| contribution | Met | Met | `CONTRIBUTING.md` explains the contribution process, including forking, cloning, opening pull requests, installing dependencies, and running local checks. |
+| contribution_requirements | Met | Met | `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and the pull request template define expectations for acceptable contributions, tests, linting, and community behavior. |
+| floss_license | Met | Met | The project is released under the MIT license, which is a FLOSS license. |
+| floss_license_osi | Met | Met | The MIT license is approved by the Open Source Initiative. |
+| license_location | Met | Met | The repository includes the project license in the top-level `LICENSE.md` file. |
+| documentation_basics | Met | Met | Basic documentation is published at https://amqtt.readthedocs.io/ and includes installation, quickstart, broker/client usage, configuration, and plugin documentation. |
+| documentation_interface | Met | Met | External interfaces are documented in the published docs, including CLI references, broker/client API references, configuration references, and plugin interfaces. |
+| sites_https | Met | Met | The project homepage, documentation, repository, and package/distribution URLs use HTTPS. |
+| discussion | Met | Met | Public project discussion happens through GitHub issues, pull requests, and discussions. |
+| english | Met | Met | The project issue tracker, pull requests, documentation, and contribution guidance are available in English. |
+| maintained | Met | Met | The project is active, has recent releases and repository activity, and is pursuing current OpenSSF remediation work. |
+| repo_public | Met | Met | The source repository is publicly readable at https://github.com/Yakifo/amqtt. |
+| repo_track | Met | Met | GitHub hosts the project in Git, providing a public history of changes, authors, and timestamps. |
+| repo_interim | Met | Met | Proposed changes are visible through GitHub pull requests before merge. Enable branch protection for `main` to make this enforcement stronger. |
+| repo_distributed | Met | Met | The repository uses Git, a distributed version control system. |
+| version_unique | Met | Met | Official releases use unique version identifiers such as `v0.11.3`, and the package version is declared in `pyproject.toml`. |
+| version_semver | Met | Met | The project uses SemVer-style version identifiers, such as `0.11.3` and `v0.11.3`. |
+| version_tags | Met | Met | Release versions are recorded as Git tags at https://github.com/Yakifo/amqtt/tags. |
+| release_notes | Met | Met | Release notes are maintained in `docs/changelog.md` and include linked pull requests, issues, API changes, bug fixes, and security-relevant notes. |
+| release_notes_vulns | Met | Met | No publicly known runtime vulnerabilities with CVE or similar identifiers have been identified for recent releases; future fixed vulnerabilities should be listed in release notes. |
+| report_process | Met | Met | Bug reporting is documented in the README, which directs users to open GitHub issues at https://github.com/Yakifo/amqtt/issues/new. |
+| report_tracker | Met | Met | Bug reports are tracked publicly in GitHub Issues at https://github.com/Yakifo/amqtt/issues. |
+| report_responses | Met | Met | The project responds to bug reports through GitHub Issues and associated pull requests. |
+| enhancement_responses | Met | Met | Enhancement requests are handled through GitHub Issues, pull requests, milestones, and project discussion channels. |
+| report_archive | Met | Met | Issue and discussion archives are publicly readable through GitHub Issues, Pull Requests, and Discussions. |
+| vulnerability_report_process | ? | Unmet | Update `SECURITY.md` with a vulnerability reporting process. PR https://github.com/Yakifo/amqtt/pull/346 adds private GitHub Security Advisory reporting and can support marking this `Met` after merge. |
+| vulnerability_report_private | ? | Unmet | Provide private vulnerability reporting instructions, preferably GitHub Security Advisories, in `SECURITY.md`. PR https://github.com/Yakifo/amqtt/pull/346 adds this and can support marking this `Met` after merge. |
+| vulnerability_report_response | ? | N/A | If no vulnerability reports were received in the last 6 months, mark `N/A` and state that no reports were received. If reports were received, mark `Met` only if each initial response was within 14 days. |
+| build | Met | Met | The project has a working build system through `pyproject.toml` and Hatch, with Docker image build targets in `Makefile`. |
+| build_common_tools | Met | Met | The project uses common build tools: Python packaging via Hatch/uv and Docker Buildx for container builds. |
+| build_floss_tools | Met | Met | Build and dependency tooling uses FLOSS tools, and Python dependencies are available through PyPI and tracked in `pyproject.toml` and `uv.lock`. |
+| test | Met | Met | The repository includes an automated pytest test suite under `tests/`. |
+| test_invocation | Met | Met | Tests are invoked with pytest, including the documented and CI command `uv run --frozen pytest tests/`. |
+| test_most | Met | Met | The CI workflow runs the pytest suite with coverage reporting across supported Python versions. |
+| test_continuous_integration | Met | Met | GitHub Actions runs tests on pull requests and pushes using `.github/workflows/ci.yml`. |
+| test_policy | ? | Met | `CONTRIBUTING.md` states that new features should add tests, bug fixes should reproduce the issue in a test, and coverage should not decrease. |
+| tests_are_added | ? | Unmet | Audit recent major changes and cite pull requests showing corresponding tests were added or updated. Add missing tests for recent major changes before marking this `Met`. |
+| tests_documented_added | ? | Met | The policy for adding tests is documented in `CONTRIBUTING.md` under the testing guidance. |
+| warnings | Met | Met | CI runs mypy, pylint, and ruff to detect code quality issues and common mistakes; CodeQL also runs for security analysis. |
+| warnings_fixed | ? | Met | CI fails on mypy, pylint, and ruff findings, so warnings found by the configured tools must be fixed or explicitly addressed before the checks pass. |
+| warnings_strict | ? | Met | The project uses multiple strict linting/type-checking tools in CI: ruff, pylint, and mypy. |
+| know_secure_design | ? | Unmet | Confirm and document that at least one primary developer understands secure design principles, such as least privilege, fail-safe defaults, complete mediation, input validation, and limited attack surface. |
+| know_common_errors | ? | Unmet | Confirm and document that at least one primary developer knows the common vulnerability classes for Python network services, such as injection, unsafe deserialization, authentication failures, secret exposure, and dependency risks. |
+| crypto_published | Met | Met | Cryptographic functionality relies on published libraries and platforms such as Python `ssl` and the `cryptography` package. |
+| crypto_call | Met | Met | The project calls published cryptographic libraries instead of implementing custom cryptographic algorithms. |
+| crypto_floss | Met | Met | The cryptographic libraries used by the project are FLOSS dependencies available through Python packaging channels. |
+| crypto_keylength | N/A | N/A | The project does not enforce or implement cryptographic key length policy itself; TLS/key choices are user configuration or delegated to underlying libraries. |
+| crypto_working | N/A | N/A | The project does not implement cryptographic algorithms directly; cryptographic operation is delegated to maintained libraries. |
+| crypto_weaknesses | N/A | N/A | The project does not implement cryptographic algorithms directly; weakness avoidance is delegated to Python `ssl` and cryptographic dependencies. |
+| crypto_pfs | N/A | N/A | Perfect forward secrecy policy is not implemented by the project itself and depends on user TLS configuration and the underlying TLS stack. |
+| crypto_password_storage | N/A | N/A | The project does not centrally enforce inbound password storage for external users; password storage is plugin/configuration dependent. |
+| crypto_random | Met | Met | The certificate helper/plugin documentation uses platform cryptographic libraries for key and certificate generation rather than custom random generation. |
+| delivery_mitm | Met | Met | Official distribution channels use HTTPS, including GitHub, PyPI, and documentation hosting. |
+| delivery_unsigned | ? | Met | The project does not instruct users to retrieve cryptographic hashes over HTTP and trust them without signature verification; distribution channels use HTTPS. |
+| vulnerabilities_fixed_60_days | Met | Met | No unpatched publicly known medium-or-higher severity runtime vulnerabilities are currently identified for the project. |
+| vulnerabilities_critical_fixed | Met | Met | No unpatched publicly known critical runtime vulnerabilities are currently identified for the project. |
+| no_leaked_credentials | Met | Met | No leaked credentials are known in the repository. PR https://github.com/Yakifo/amqtt/pull/346 adds Gitleaks scanning for stronger ongoing protection after merge. |
+| static_analysis | ? | Met | CodeQL, mypy, pylint, and ruff are applied through CI before proposed production changes are released. |
+| static_analysis_common_vulnerabilities | ? | Met | CodeQL includes security rules for common vulnerabilities in Python code, and it runs through the CodeQL workflow. |
+| static_analysis_fixed | ? | Met | Static-analysis findings are expected to be fixed before release because CodeQL and lint/type checks run in CI; no medium-or-higher exploitable static-analysis findings are currently known. |
+| static_analysis_often | ? | Met | Static analysis runs on pull requests and pushes through GitHub Actions workflows. |
+| dynamic_analysis | ? | Unmet | Add dynamic analysis before major releases, such as fuzzing for MQTT packet parsing or documented automated test coverage of at least 80 percent branch coverage. PR https://github.com/Yakifo/amqtt/pull/346 adds fuzzing support and can support marking this `Met` after merge. |
+| dynamic_analysis_unsafe | ? | N/A | The project is Python-based and does not include project-produced C/C++ or other memory-unsafe implementation code requiring sanitizer-backed dynamic analysis. |
+| dynamic_analysis_enable_assertions | ? | Met | Tests run under normal Python execution through pytest, where Python assertions are enabled unless optimization is explicitly requested. |
+| dynamic_analysis_fixed | ? | N/A | If no dynamic-analysis vulnerabilities have been found, mark `N/A`; once fuzzing or another dynamic-analysis tool is in use, mark `Met` only when all confirmed medium-or-higher findings are fixed in a timely way. |
+
 ## OpenSSF Baseline Level 1 Badge Entries
 
 Source: https://www.bestpractices.dev/en/projects/13571/baseline-1
@@ -261,51 +338,74 @@ Source: https://www.bestpractices.dev/en/projects/13571/baseline-1
 | OSPS-QA-05.02 | Met | The repository does not track unreviewable binary artifacts such as executables, compiled libraries, wheels, archives, or generated application binaries. |
 | OSPS-VM-02.01 | Met | Security contacts and private vulnerability reporting instructions are documented in SECURITY.md: https://github.com/Yakifo/amqtt/blob/main/SECURITY.md. |
 
-## OpenSSF Baseline Level 1 Checklist
+### Post-Merge Updates for Unmet Entries
 
-Source: https://baseline.openssf.org/versions/2026-02-19.html#level-1
+Use these replacement entries after https://github.com/Yakifo/amqtt/pull/346 is merged to `main`.
 
-### Access Control
+| Criterion | Status | Justification |
+|---|---|---|
+| OSPS-BR-01.01 | Met | CI workflows validate untrusted GitHub metadata before use. The workflows check base refs, head refs, ref names, and release tag formats before downstream CI/CD jobs run. |
+| OSPS-BR-01.03 | Met | CI workflows that operate on untrusted pull request code run with restricted token permissions and do not persist checkout credentials. Privileged credentials and assets are not exposed to untrusted code snapshots. |
+| OSPS-BR-07.01 | Met | The project uses Gitleaks secret scanning through pre-commit and CI to detect hardcoded secrets, credentials, private keys, and similar sensitive data before they are stored in version control. |
 
-- [ ] OSPS-AC-01.01: Confirm sensitive repository actions require MFA.
-- [ ] OSPS-AC-02.01: Confirm new collaborators require manual permission assignment or default to least privilege.
-- [ ] OSPS-AC-03.01: Confirm direct commits to the primary branch are blocked.
-- [ ] OSPS-AC-03.02: Confirm primary branch deletion requires explicit confirmation.
+## OpenSSF Baseline Level 2 Badge Entries
 
-### Build and Release
+Source: https://www.bestpractices.dev/en/projects/13571/baseline-2
 
-- [ ] OSPS-BR-01.01: Review CI/CD handling of untrusted metadata for sanitization and validation.
-- [ ] OSPS-BR-01.03: Confirm CI/CD jobs for untrusted code snapshots cannot access privileged credentials or assets.
-- [ ] OSPS-BR-03.01: Confirm official project channel URIs use encrypted channels.
-- [ ] OSPS-BR-03.02: Confirm official distribution channels use cryptographically authenticated channels.
-- [ ] OSPS-BR-07.01: Confirm controls prevent unencrypted secrets or credentials from being stored in version control.
+Current published status for each Level 2 entry is `?`. The table below provides
+the recommended status and either copy-ready justification text or the change
+needed before marking the entry `Met`.
 
-### Documentation
+| Criterion | Recommended Status | Suggested Justification or Needed Change |
+|---|---|---|
+| OSPS-AC-04.01 | Unmet | Set the GitHub Actions default `GITHUB_TOKEN` permissions to read-only at the repository or organization level, and add restrictive top-level `permissions` to every workflow. Grant write permissions only on jobs that require them. |
+| OSPS-BR-02.01 | Met | Official releases use unique version identifiers. Releases are tagged with versioned Git tags such as `v0.11.3`, and the Python package version is declared in `pyproject.toml`. |
+| OSPS-BR-04.01 | Met | Release changes are documented in `docs/changelog.md`, which lists functional changes, bug fixes, security-relevant fixes, and linked pull requests or issues for each release. |
+| OSPS-BR-05.01 | Met | Build and CI dependency installation use standardized Python tooling: dependencies are declared in `pyproject.toml`, resolved in `uv.lock`, installed with `uv`, and built with the Python packaging build backend configured in `pyproject.toml`. |
+| OSPS-BR-06.01 | Unmet | Add signed release artifacts or signed provenance/attestations for each official release. The signed manifest or attestation should include cryptographic hashes for every release asset. |
+| OSPS-DO-06.01 | Unmet | Add project documentation describing how dependencies are selected, obtained, updated, and tracked. The documentation should reference `pyproject.toml`, `uv.lock`, Renovate, and the expected review/update process. |
+| OSPS-DO-07.01 | Unmet | Add explicit build instructions to the documentation. Include supported Python versions, required system packages such as OpenLDAP/SASL development libraries when needed, `uv sync`, and the command to build release artifacts such as `uv build`. |
+| OSPS-GV-01.01 | Unmet | Add governance documentation listing project members with access to sensitive resources, such as repository administration, release publishing, package publishing, and security advisory handling. |
+| OSPS-GV-01.02 | Unmet | Add governance documentation describing maintainer, reviewer, release manager, and security contact roles and responsibilities. |
+| OSPS-GV-03.02 | Met | `CONTRIBUTING.md` and the pull request template describe contributor expectations, including development setup, tests, linting, test coverage expectations, and the PR checklist for acceptable contributions. |
+| OSPS-LE-01.01 | Unmet | Require a contributor legal authorization assertion on every commit. Add a DCO or CLA policy and enforce it with a required DCO/CLA check, such as signed-off commits through a DCO bot. |
+| OSPS-QA-03.01 | Unmet | Enable branch protection or a repository ruleset for `main` that requires automated status checks to pass before merge, with any bypass limited to explicit maintainer override. |
+| OSPS-QA-06.01 | Unmet | Require at least one automated test suite before commits are accepted to `main`. The existing test workflow can satisfy this once branch protection or rulesets require the test checks before merge. |
+| OSPS-SA-01.01 | Unmet | Add design documentation that identifies major actors and actions in the broker/client system, such as clients, broker listeners, plugins, authentication/authorization flows, persistence, and external services. |
+| OSPS-SA-02.01 | Met | External software interfaces are documented in the published documentation, including CLI references, broker/client API references, configuration references, and plugin interface documentation. |
+| OSPS-SA-03.01 | Unmet | Perform and document a security assessment for the released software, covering likely and impactful security problems in MQTT parsing, authentication, authorization, plugin execution, TLS configuration, and broker/client network exposure. |
+| OSPS-VM-01.01 | Unmet | Add a coordinated vulnerability disclosure policy with response timelines to `SECURITY.md`. PR https://github.com/Yakifo/amqtt/pull/346 adds this and can support marking the entry `Met` after merge. |
+| OSPS-VM-03.01 | Unmet | Provide private vulnerability reporting directly to security contacts, such as GitHub Security Advisories, and document it in `SECURITY.md`. PR https://github.com/Yakifo/amqtt/pull/346 adds this and can support marking the entry `Met` after merge. |
+| OSPS-VM-04.01 | Unmet | Document where vulnerability data is publicly published, such as GitHub Security Advisories, CVE/GHSA records, release notes, or a vulnerability history page, and publish discovered vulnerability records there. |
 
-- [ ] OSPS-DO-01.01: Confirm released project documentation includes user guides for basic functionality.
-- [ ] OSPS-DO-02.01: Confirm released project documentation explains how to report defects.
+## OpenSSF Baseline Level 3 Badge Entries
 
-### Governance
+Source: https://www.bestpractices.dev/en/projects/13571/baseline-3
 
-- [ ] OSPS-GV-02.01: Confirm the project has public mechanisms for discussing proposed changes and usage obstacles.
-- [ ] OSPS-GV-03.01: Confirm project documentation explains the contribution process.
+Current published status for each Level 3 entry is `?`. The table below provides
+the recommended status and either copy-ready justification text or the change
+needed before marking the entry `Met`.
 
-### Legal
-
-- [ ] OSPS-LE-02.01: Confirm the source code license meets the OSI Open Source Definition or FSF Free Software Definition.
-- [ ] OSPS-LE-02.02: Confirm the released software asset license meets the OSI Open Source Definition or FSF Free Software Definition.
-- [ ] OSPS-LE-03.01: Confirm the source code license is maintained in a `LICENSE` file, `COPYING` file, or `LICENSE/` directory.
-- [ ] OSPS-LE-03.02: Confirm the release asset license is included in released source code or alongside the release assets.
-
-### Quality
-
-- [ ] OSPS-QA-01.01: Confirm the source repository is publicly readable at a static URL.
-- [ ] OSPS-QA-01.02: Confirm the version control system has a publicly readable change history with author and date metadata.
-- [ ] OSPS-QA-02.01: Confirm the repository includes a dependency list for direct language dependencies.
-- [ ] OSPS-QA-04.01: If multiple repositories are used, document the codebases that are part of the project.
-- [ ] OSPS-QA-05.01: Confirm the version control system does not contain generated executable artifacts.
-- [ ] OSPS-QA-05.02: Confirm the version control system does not contain unreviewable binary artifacts.
-
-### Vulnerability Management
-
-- [ ] OSPS-VM-02.01: Confirm project documentation contains security contacts.
+| Criterion | Recommended Status | Suggested Justification or Needed Change |
+|---|---|---|
+| OSPS-AC-04.02 | Unmet | Assign explicit least-privilege permissions in every CI/CD workflow. PR https://github.com/Yakifo/amqtt/pull/346 adds restrictive top-level permissions and job-level write permissions only where required; mark `Met` after that lands and all workflows follow the same pattern. |
+| OSPS-BR-01.04 | N/A | The current workflows do not define manual `workflow_dispatch` inputs or other trusted collaborator-supplied workflow parameters. If trusted inputs are added later, validate and constrain them before use. |
+| OSPS-BR-02.02 | Met | Release assets are associated with the release identifier through versioned Git tags and Python package filenames/metadata that include the project name and version, such as `amqtt` version `0.11.3`. |
+| OSPS-BR-07.02 | Unmet | Add a documented secrets management policy covering where secrets may be stored, who may access them, how they are rotated, and what to do after suspected exposure. |
+| OSPS-DO-03.01 | Unmet | Add release verification documentation explaining how users can verify release asset integrity and authenticity, including checksums, signatures, provenance, or attestations. |
+| OSPS-DO-03.02 | Unmet | Add documentation explaining how users can verify the expected identity of the person or automated process that authored a release, such as trusted publisher identity, signing identity, or provenance issuer. |
+| OSPS-DO-04.01 | Unmet | Add release support documentation describing the scope and duration of support for each supported release line. PR https://github.com/Yakifo/amqtt/pull/346 adds a basic supported-versions table, but Level 3 should also describe support scope and timing. |
+| OSPS-DO-05.01 | Unmet | Add documentation stating when releases or versions stop receiving security updates. PR https://github.com/Yakifo/amqtt/pull/346 adds a starting supported-versions table; expand it into a clear end-of-support policy. |
+| OSPS-GV-04.01 | Unmet | Add a policy requiring review of code collaborators before granting escalated access to sensitive resources such as repository administration, package publishing, release signing, and security advisories. |
+| OSPS-QA-02.02 | Unmet | If wheels, containers, or other built release assets are official release artifacts, publish an SBOM for each release asset. If the project only releases source artifacts, document why this criterion is not applicable. |
+| OSPS-QA-04.02 | N/A | The project is currently tracked as a single-repository project, so there are no released subprojects that need separate security requirement enforcement. |
+| OSPS-QA-06.02 | Unmet | Document when and how tests run, including local test commands, CI triggers, supported Python version matrix, required checks, and when maintainers may rerun or bypass tests. |
+| OSPS-QA-06.03 | Met | `CONTRIBUTING.md` states that new features should add corresponding tests, bug fixes should reproduce the issue in a test, and testing coverage should not decrease. |
+| OSPS-QA-07.01 | Unmet | Enable branch protection or a repository ruleset for `main` that requires at least one non-author human approval before merge. |
+| OSPS-SA-03.02 | Unmet | Perform and document threat modeling and attack surface analysis for critical code paths, including MQTT parsing, authentication, authorization, plugin execution, TLS configuration, persistence, and network listener behavior. |
+| OSPS-VM-04.02 | Unmet | Publish VEX data for vulnerabilities in software components that do not affect the project, or document that no such non-affecting component vulnerabilities currently exist and where future VEX records will be published. |
+| OSPS-VM-05.01 | Unmet | Add an SCA policy defining remediation thresholds for dependency vulnerabilities and license findings, including severity levels, timelines, and accepted suppression criteria. |
+| OSPS-VM-05.02 | Unmet | Add a release policy requiring SCA violations to be resolved, suppressed with justification, or otherwise addressed before any release is published. |
+| OSPS-VM-05.03 | Unmet | Add automated SCA checks for every change, backed by the documented SCA policy, and require the checks to pass before merge except for documented non-exploitable suppressions. |
+| OSPS-VM-06.01 | Unmet | Add a SAST policy defining remediation thresholds for security weakness findings, including severity levels, timelines, and accepted suppression criteria. |
+| OSPS-VM-06.02 | Unmet | Require SAST checks such as CodeQL on every change, block merges on policy violations through required checks, and document the allowed non-exploitable suppression process. |
