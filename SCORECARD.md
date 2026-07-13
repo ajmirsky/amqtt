@@ -230,6 +230,37 @@ Add dated entries after each Scorecard rerun or remediation batch.
 | 2026-07-08 | local remediation | Completed local workflow hardening, action pinning, Docker pinning, security policy updates, local MQTT parser fuzz tests, dependency vulnerability updates, and scheduled CodeQL. |
 | 2026-07-08 | 5.4 / 10 | Baseline run before remediation work. |
 
+## OpenSSF Baseline Level 1 Badge Entries
+
+Source: https://www.bestpractices.dev/en/projects/13571/baseline-1
+
+| Criterion | Status | Justification |
+|---|---|---|
+| OSPS-AC-01.01 | Met | The project is hosted on GitHub. GitHub requires 2FA for contributors who can perform sensitive repository actions, and repository administration is limited to maintainers using GitHub accounts. |
+| OSPS-AC-02.01 | Met | The project is hosted on GitHub. Collaborator access is not granted automatically; a repository administrator must explicitly invite a person or team and choose the repository role to grant. The project follows least privilege: contributors use forks and pull requests by default, and elevated permissions such as Write, Maintain, or Admin are granted manually only when needed for the contributor's role. |
+| OSPS-AC-03.01 | Met | The primary branch is main. GitHub branch protection/rulesets prevent direct commits to main; changes must be proposed through pull requests before being merged. |
+| OSPS-AC-03.02 | Met | The primary branch is main. GitHub branch protection/rulesets protect main from deletion and require explicit privileged action to change protected branch settings. |
+| OSPS-BR-01.01 | Unmet | Fixed with PR: https://github.com/Yakifo/amqtt/pull/346 |
+| OSPS-BR-01.03 | Unmet | Fixed with PR: https://github.com/Yakifo/amqtt/pull/346 |
+| OSPS-BR-03.01 | Met | Official project channels use encrypted HTTPS URLs: https://amqtt.io, https://github.com/Yakifo/amqtt, https://amqtt.readthedocs.io/, and https://pypi.org/project/amqtt/. |
+| OSPS-BR-03.02 | Met | Distribution channels use HTTPS exclusively. |
+| OSPS-BR-07.01 | Unmet | Fixed with PR: https://github.com/Yakifo/amqtt/pull/346 |
+| OSPS-DO-01.01 | Met | User documentation for basic functionality is published at https://amqtt.readthedocs.io/ and includes quickstart, broker/client usage, configuration, and CLI reference documentation. |
+| OSPS-DO-02.01 | Met | Defect reporting is documented in the README: users are directed to open GitHub issues at https://github.com/Yakifo/amqtt/issues/new for bugs, patches, and suggestions. |
+| OSPS-GV-02.01 | Met | GitHub supports public discussions on proposed changes through pull requests and usage obstacles through issues. |
+| OSPS-GV-03.01 | Met | Contribution process documented in repository. |
+| OSPS-LE-02.01 | Met | The MIT license for the repository contents is approved by the Open Source Initiative (OSI). |
+| OSPS-LE-02.02 | Met | The MIT license is approved by the Open Source Initiative (OSI). |
+| OSPS-LE-03.01 | Met | License file found in repository. |
+| OSPS-LE-03.02 | Met | Non-trivial license location file in repository: https://github.com/Yakifo/amqtt/blob/main/LICENSE.md. |
+| OSPS-QA-01.01 | Met | Repository is publicly available on GitHub. |
+| OSPS-QA-01.02 | Met | Repository git metadata is publicly available on GitHub. |
+| OSPS-QA-02.01 | Met | Direct Python dependencies are declared in pyproject.toml, and the resolved dependency set is tracked in uv.lock: https://github.com/Yakifo/amqtt/blob/main/pyproject.toml and https://github.com/Yakifo/amqtt/blob/main/uv.lock. |
+| OSPS-QA-04.01 | N/A | Single repository project. |
+| OSPS-QA-05.01 | Met | The repository does not track generated executable artifacts; builds, distributions, caches, and compiled outputs are excluded from version control. |
+| OSPS-QA-05.02 | Met | The repository does not track unreviewable binary artifacts such as executables, compiled libraries, wheels, archives, or generated application binaries. |
+| OSPS-VM-02.01 | Met | Security contacts and private vulnerability reporting instructions are documented in SECURITY.md: https://github.com/Yakifo/amqtt/blob/main/SECURITY.md. |
+
 ## OpenSSF Baseline Level 1 Checklist
 
 Source: https://baseline.openssf.org/versions/2026-02-19.html#level-1
