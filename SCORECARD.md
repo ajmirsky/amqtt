@@ -98,7 +98,7 @@ with OSV Scanner; `docs_test/package-lock.json` also passes `npm audit`.
 - [x] Update vulnerable `docs_test` transitive dependencies.
 - [x] Run focused Python tests affected by dependency updates.
 - [x] Run `docs_test` production build.
-- [ ] Run the full test suite after dependency updates.
+- [x] Run the full test suite after dependency updates.
 - [ ] Rerun Scorecard after these changes are merged to `source/main`.
 
 ## Medium Impact
@@ -180,14 +180,19 @@ Reason: CodeQL is configured, but not all recent commits were checked.
 
 ### Packaging
 
-Current score: not scored
+Current public score: not scored
 
 Reason: no publishing workflow was detected.
 
-- [ ] Decide whether releases should publish to PyPI from GitHub Actions.
-- [ ] Add a trusted-publishing PyPI release workflow if appropriate.
-- [ ] Add release provenance or attestations if practical.
-- [ ] Rerun Scorecard and confirm whether Packaging is now scored.
+Local status: local Scorecard reports 10 / 10 for Packaging after adding a
+release-published PyPI trusted publishing workflow.
+
+- [x] Decide whether releases should publish to PyPI from GitHub Actions.
+- [x] Add a trusted-publishing PyPI release workflow if appropriate.
+- [x] Add release provenance or attestations if practical.
+- [x] Confirm local Scorecard detects the packaging workflow.
+- [ ] Configure the PyPI trusted publisher for project `amqtt` with repository `Yakifo/amqtt`, workflow `publish-pypi.yml`, and environment `pypi`.
+- [ ] Rerun public Scorecard after this workflow lands on `source/main`.
 
 ### Signed Releases
 
@@ -216,9 +221,60 @@ Add dated entries after each Scorecard rerun or remediation batch.
 
 | Date | Aggregate | Notes |
 |---|---:|---|
+| 2026-07-08 | local Packaging 10 / 10 | Added release-published PyPI trusted publishing workflow with separate build and OIDC publish jobs; local Scorecard keeps Token-Permissions and Pinned-Dependencies at 10 / 10. |
+| 2026-07-08 | full suite pass | `uv run --frozen pytest tests/` passed: 478 passed, 44 warnings. |
 | 2026-07-08 | local Pinned-Dependencies 10 / 10 | Added hash-checked Docker build dependency install and hash-checked ClusterFuzzLite build dependency install. |
 | 2026-07-08 | local Fuzzing 10 / 10 | Added ClusterFuzzLite PR workflow, Python/Atheris MQTT packet fuzzer, and `.clusterfuzzlite` build integration; local Scorecard detects ClusterFuzzLite and PythonAtherisFuzzer. |
 | 2026-07-08 | local clean | Fixed `docs_test/package-lock.json` vulnerabilities; `npm audit` and OSV Scanner are clean, and `docs_test` build passes. |
 | 2026-07-08 | 5.4 / 10 | Authenticated GitHub-backed rerun against `source/main` commit `31995b2`; unchanged because local `openssf` branch remediations are not merged upstream. |
 | 2026-07-08 | local remediation | Completed local workflow hardening, action pinning, Docker pinning, security policy updates, local MQTT parser fuzz tests, dependency vulnerability updates, and scheduled CodeQL. |
 | 2026-07-08 | 5.4 / 10 | Baseline run before remediation work. |
+
+## OpenSSF Baseline Level 1 Checklist
+
+Source: https://baseline.openssf.org/versions/2026-02-19.html#level-1
+
+### Access Control
+
+- [ ] OSPS-AC-01.01: Confirm sensitive repository actions require MFA.
+- [ ] OSPS-AC-02.01: Confirm new collaborators require manual permission assignment or default to least privilege.
+- [ ] OSPS-AC-03.01: Confirm direct commits to the primary branch are blocked.
+- [ ] OSPS-AC-03.02: Confirm primary branch deletion requires explicit confirmation.
+
+### Build and Release
+
+- [ ] OSPS-BR-01.01: Review CI/CD handling of untrusted metadata for sanitization and validation.
+- [ ] OSPS-BR-01.03: Confirm CI/CD jobs for untrusted code snapshots cannot access privileged credentials or assets.
+- [ ] OSPS-BR-03.01: Confirm official project channel URIs use encrypted channels.
+- [ ] OSPS-BR-03.02: Confirm official distribution channels use cryptographically authenticated channels.
+- [ ] OSPS-BR-07.01: Confirm controls prevent unencrypted secrets or credentials from being stored in version control.
+
+### Documentation
+
+- [ ] OSPS-DO-01.01: Confirm released project documentation includes user guides for basic functionality.
+- [ ] OSPS-DO-02.01: Confirm released project documentation explains how to report defects.
+
+### Governance
+
+- [ ] OSPS-GV-02.01: Confirm the project has public mechanisms for discussing proposed changes and usage obstacles.
+- [ ] OSPS-GV-03.01: Confirm project documentation explains the contribution process.
+
+### Legal
+
+- [ ] OSPS-LE-02.01: Confirm the source code license meets the OSI Open Source Definition or FSF Free Software Definition.
+- [ ] OSPS-LE-02.02: Confirm the released software asset license meets the OSI Open Source Definition or FSF Free Software Definition.
+- [ ] OSPS-LE-03.01: Confirm the source code license is maintained in a `LICENSE` file, `COPYING` file, or `LICENSE/` directory.
+- [ ] OSPS-LE-03.02: Confirm the release asset license is included in released source code or alongside the release assets.
+
+### Quality
+
+- [ ] OSPS-QA-01.01: Confirm the source repository is publicly readable at a static URL.
+- [ ] OSPS-QA-01.02: Confirm the version control system has a publicly readable change history with author and date metadata.
+- [ ] OSPS-QA-02.01: Confirm the repository includes a dependency list for direct language dependencies.
+- [ ] OSPS-QA-04.01: If multiple repositories are used, document the codebases that are part of the project.
+- [ ] OSPS-QA-05.01: Confirm the version control system does not contain generated executable artifacts.
+- [ ] OSPS-QA-05.02: Confirm the version control system does not contain unreviewable binary artifacts.
+
+### Vulnerability Management
+
+- [ ] OSPS-VM-02.01: Confirm project documentation contains security contacts.
