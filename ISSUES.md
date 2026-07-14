@@ -29,6 +29,7 @@ The upcoming `mqtt -> mqtt3` release branch should absorb the shared protocol-ha
 | `#004` | `#329` | created |
 | `#005` | `#327` | created |
 | `#006` | `#342` | created |
+| `#007` | `#348` | created |
 | `#013` | `#325` | created |
 | `#014` | `#343` | created |
 
@@ -231,7 +232,7 @@ Create the `tests/mqtt5/` directory structure and shared fixtures before any Pha
 Several Phase 2 and Phase 3 issues introduce new config keys (e.g. `receive_maximum`, `topic_alias_maximum`, `session_expiry_interval`, `mqtt_version`). This issue establishes where those keys live and validates them at startup, so later issues can reference a stable schema rather than each inventing their own parsing.
 
 **Scope:**
-- [ ] Define the new broker config keys under a `[mqtt5]` section (or flat alongside existing keys — decide and document the choice): `receive_maximum`, `topic_alias_maximum`, `maximum_packet_size`, `shared_subscriptions_available`, `subscription_identifiers_available`, `wildcard_subscriptions_available`.
+- [ ] Define the new broker config keys under a `[mqtt5]` section (or flat alongside existing keys — decide and document the choice): `receive_maximum`, `topic_alias_maximum`, `maximum_packet_size`, `maximum_qos`, `retain_available`, `shared_subscription_available`, `subscription_identifier_available`, `wildcard_subscription_available`.
 - [ ] Define the new client config keys: `mqtt_version` (int, default 4), `session_expiry_interval`, `receive_maximum`, `maximum_packet_size`, `topic_alias_maximum`, `user_properties`, `authentication_method`, `authentication_data`.
 - [ ] Add validation: unknown or out-of-range values raise a clear `ConfigurationError` at startup.
 - [ ] Document each key with its default and the spec section that governs it.
@@ -285,7 +286,7 @@ GitHub: `#327`
 
 **Changes from v3.1.1:**
 - Return code becomes Reason Code (1 byte, uses unified `ReasonCode` enum).
-- New CONNACK Properties section (§3.2.2.3): Session Expiry Interval, Receive Maximum, Maximum QoS, Retain Available, Maximum Packet Size, Assigned Client Identifier, Topic Alias Maximum, Reason String, User Properties, Wildcard Subscription Available, Subscription Identifiers Available, Shared Subscription Available, Server Keep Alive, Response Information, Server Reference, Authentication Method, Authentication Data.
+- New CONNACK Properties section (§3.2.2.3): Session Expiry Interval, Receive Maximum, Maximum QoS, Retain Available, Maximum Packet Size, Assigned Client Identifier, Topic Alias Maximum, Reason String, User Properties, Wildcard Subscription Available, Subscription Identifier Available, Shared Subscription Available, Server Keep Alive, Response Information, Server Reference, Authentication Method, Authentication Data.
 
 **Scope:**
 - [x] Extend `ConnackPacket` to produce and parse v5 CONNACK with Properties.
@@ -319,6 +320,8 @@ GitHub: `#342`
 ---
 
 ### Issue #007 [MQTT5-CORE] — PUBACK / PUBREC / PUBREL / PUBCOMP v5 support
+
+GitHub: `#348`
 
 **Spec:** §3.4, §3.5, §3.6, §3.7
 
@@ -530,7 +533,7 @@ Send the following CONNACK Properties for v5 connections:
 - [ ] `Maximum Packet Size` — if broker imposes a limit.
 - [ ] `Topic Alias Maximum` — broker's limit on aliases (configurable, default 0 = no aliases).
 - [ ] `Wildcard Subscription Available` — always true unless disabled.
-- [ ] `Subscription Identifiers Available` — always true unless disabled.
+- [ ] `Subscription Identifier Available` — always true unless disabled.
 - [ ] `Shared Subscription Available` — true if broker supports shared subscriptions.
 - [ ] `Assigned Client Identifier` — if broker assigned the client ID.
 
@@ -802,7 +805,7 @@ CONNACK can declare that selected server features are unavailable. The broker mu
 - [ ] Enforce configured `Maximum QoS`: reject CONNECT Will QoS and incoming PUBLISH QoS greater than the broker's maximum with reason code `0x9B QoS Not Supported`.
 - [ ] Enforce `Retain Available = 0`: reject retained Will messages at CONNECT and retained PUBLISH packets with reason code `0x9A Retain Not Supported`.
 - [ ] Enforce `Wildcard Subscription Available = 0`: reject wildcard SUBSCRIBE packets with DISCONNECT or SUBACK reason code `0xA2 Wildcard Subscriptions Not Supported`.
-- [ ] Enforce `Subscription Identifiers Available = 0`: reject SUBSCRIBE packets containing Subscription Identifier with DISCONNECT `0xA1 Subscription Identifiers Not Supported`.
+- [ ] Enforce `Subscription Identifier Available = 0`: reject SUBSCRIBE packets containing Subscription Identifier with DISCONNECT `0xA1 Subscription Identifiers Not Supported`.
 - [ ] Enforce `Shared Subscription Available = 0`: reject shared SUBSCRIBE packets with DISCONNECT or SUBACK reason code `0x9E Shared Subscriptions Not Supported`.
 - [ ] Keep v3.1.1 behavior unchanged for equivalent unsupported features.
 
