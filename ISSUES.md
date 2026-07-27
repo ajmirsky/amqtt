@@ -25,13 +25,18 @@ The upcoming `mqtt -> mqtt3` release branch should absorb the shared protocol-ha
 | `#001` | `#324` | created |
 | `#002` | `#328` | created |
 | `#003` | `#326` | created |
+| `#003a` | `#353` | created |
 | `#003b` | `#330` | created |
 | `#004` | `#329` | created |
 | `#005` | `#327` | created |
 | `#006` | `#342` | created |
 | `#007` | `#348` | created |
+| `#008` | `#356` | created |
+| `#009` | `#355` | created |
+| `#011` | `#354` | created |
 | `#013` | `#325` | created |
 | `#014` | `#343` | created |
+| `#037` | `#357` | created |
 
 Add rows here as public GitHub issues are created. Keep the local numbering stable.
 
@@ -226,22 +231,24 @@ Create the `tests/mqtt5/` directory structure and shared fixtures before any Pha
 
 ---
 
-### Issue #003a [MQTT5-CORE] — Config schema: broker and client v5 parameters
+### Issue #003a [MQTT5-CORE] — Config schema: broker v5 parameters
+
+GitHub: `#353`
 
 **Summary:**
-Several Phase 2 and Phase 3 issues introduce new config keys (e.g. `receive_maximum`, `topic_alias_maximum`, `session_expiry_interval`, `mqtt_version`). This issue establishes where those keys live and validates them at startup, so later issues can reference a stable schema rather than each inventing their own parsing.
+Several Phase 2 broker issues introduce new config keys (e.g. `receive_maximum`, `topic_alias_maximum`, and server capability flags). This issue establishes where those broker keys live and validates them at startup, so later broker issues can reference a stable schema rather than each inventing their own parsing.
+
+Client-side MQTT 5.0 config is intentionally handled separately in Issue #026 with the MQTT 5 client CONNECT work, because those keys are only meaningful once the client can send v5 CONNECT packets.
 
 **Scope:**
 - [ ] Define the new broker config keys under a `[mqtt5]` section (or flat alongside existing keys — decide and document the choice): `receive_maximum`, `topic_alias_maximum`, `maximum_packet_size`, `maximum_qos`, `retain_available`, `shared_subscription_available`, `subscription_identifier_available`, `wildcard_subscription_available`.
-- [ ] Define the new client config keys: `mqtt_version` (int, default 4), `session_expiry_interval`, `receive_maximum`, `maximum_packet_size`, `topic_alias_maximum`, `user_properties`, `authentication_method`, `authentication_data`.
-- [ ] Add validation: unknown or out-of-range values raise a clear `ConfigurationError` at startup.
-- [ ] Document each key with its default and the spec section that governs it.
+- [ ] Add validation: unknown or out-of-range broker values raise a clear `ConfigurationError` at startup.
+- [ ] Document each broker key with its default and the spec section that governs it.
 
 **Acceptance criteria:**
 - [ ] A broker started with no v5 config keys uses spec-default values for all new fields.
 - [ ] A broker started with an out-of-range `receive_maximum` (e.g. 0 or > 65535) raises `ConfigurationError`.
-- [ ] A client config with `mqtt_version=5` and no other v5 keys connects successfully with spec defaults.
-- [ ] `docs/references/broker_config.md` and `docs/references/client_config.md` are updated with all new v5 keys; `mkdocs build` passes.
+- [ ] `docs/references/broker_config.md` is updated with all new broker v5 keys; `mkdocs build` passes.
 
 ---
 
@@ -343,6 +350,8 @@ GitHub: `#348`
 
 ### Issue #008 [MQTT5-CORE] — SUBSCRIBE packet v5 support
 
+GitHub: `#356`
+
 **Spec:** §3.8
 
 **Changes from v3.1.1:**
@@ -361,6 +370,8 @@ GitHub: `#348`
 ---
 
 ### Issue #009 [MQTT5-CORE] — SUBACK packet v5 support
+
+GitHub: `#355`
 
 **Spec:** §3.9
 
@@ -395,6 +406,8 @@ GitHub: `#348`
 ---
 
 ### Issue #011 [MQTT5-CORE] — DISCONNECT packet v5 support
+
+GitHub: `#354`
 
 **Spec:** §3.14
 
@@ -889,23 +902,27 @@ Will Properties include more than Will Delay. When a Will is eventually publishe
 
 ---
 
-### Issue #026 [MQTT5-CLIENT] — MQTTClient: MQTT 5.0 connect options
+### Issue #026 [MQTT5-CLIENT] — MQTTClient: MQTT 5.0 config and connect options
 
 **Spec:** §3.1, §4.1
 
 **Summary:**
-Expose MQTT 5.0 CONNECT properties in the `MQTTClient` API.
+Expose MQTT 5.0 CONNECT properties in the `MQTTClient` API. This issue owns the client-side config schema that was split out of Issue #003a, because the config keys should land with the client handler work that actually sends a v5 CONNECT packet.
 
 **Scope:**
 - [ ] Add `mqtt_version: int = 4` to client config (4 = 3.1.1, 5 = MQTT 5.0).
-- [ ] When `mqtt_version=5`, build v5 CONNECT packet with supported properties.
 - [ ] Expose config keys: `session_expiry_interval`, `receive_maximum`, `maximum_packet_size`, `topic_alias_maximum`, `user_properties`, `authentication_method`, `authentication_data`.
+- [ ] Add validation: unknown or out-of-range client values raise a clear `ConfigurationError` at startup.
+- [ ] Document each client key with its default and the spec section that governs it.
+- [ ] When `mqtt_version=5`, build v5 CONNECT packet with supported properties.
 - [ ] Read CONNACK Properties and store broker-reported limits on the session.
 
 **Acceptance criteria:**
+- [ ] A client config with `mqtt_version=5` and no other v5 keys uses spec-default values for all new fields.
 - [ ] `MQTTClient(config={"mqtt_version": 5}).connect(...)` sends a v5 CONNECT.
 - [ ] CONNACK Properties are accessible after connect: `client.session.broker_receive_maximum`, etc.
 - [ ] Default (`mqtt_version=4`) behavior is unchanged.
+- [ ] `docs/references/client_config.md` is updated with all new client v5 keys; `mkdocs build` passes.
 - [ ] `MQTTClient`, `ClientConfig`, and any new v5 config dataclasses have Google-style docstrings on all new public fields so `mkdocstrings` renders them correctly in `docs/references/client.md` and `docs/references/client_config.md`.
 
 ---
@@ -1128,6 +1145,38 @@ Appendix B of the spec lists every MUST/MUST NOT statement as a numbered checkli
 
 ---
 
+### Issue #037 [MQTT5-COMPAT] — Paho MQTT 5 QoS 1/2 broker interoperability test
+
+GitHub: `#357`
+
+**Summary:**
+Add an end-to-end interoperability test that uses Paho MQTT 5 clients against the amqtt broker to verify QoS 1 and QoS 2 publish acknowledgement flows on the broker path.
+
+**Dependencies:**
+- Depends on the Paho QoS 0 broker path:
+  `#001 → #002 → #003 → #003a → #003b → #004 → #005 → #006 → #008 → #009 → #011 → #013 → #014`
+- Depends on `#007` / GitHub `#348` for MQTT 5 PUBACK/PUBREC/PUBREL/PUBCOMP packet support.
+- This is not part of the packet-layer `#007` implementation; it belongs after the broker can dispatch and handle MQTT 5 post-CONNECT publish/subscribe packets.
+
+**Scope:**
+- Add a Paho MQTT 5 broker interoperability test, likely near the existing Paho integration tests.
+- Start an amqtt broker with MQTT 5 enabled on a loopback listener.
+- Use Paho clients configured for MQTT v5 to connect, subscribe, publish, and disconnect cleanly.
+- Verify a QoS 1 publish completes with a valid MQTT 5 PUBACK and the subscriber receives the message.
+- Verify a QoS 2 publish completes the PUBREC/PUBREL/PUBCOMP flow and the subscriber receives the message exactly once.
+- Use deterministic event synchronization and bounded timeouts; avoid sleeps that make the test flaky.
+- Keep existing MQTT 3.1.1 Paho integration tests unchanged.
+
+**Acceptance criteria:**
+- [ ] A Paho MQTT 5 client can publish QoS 1 through the amqtt broker and receive successful publish completion.
+- [ ] A Paho MQTT 5 subscriber receives the QoS 1 message payload exactly once.
+- [ ] A Paho MQTT 5 client can publish QoS 2 through the amqtt broker and complete the QoS 2 handshake.
+- [ ] A Paho MQTT 5 subscriber receives the QoS 2 message payload exactly once.
+- [ ] The test fails on malformed acknowledgement flags, malformed reason-code/properties encoding, protocol errors, or unexpected disconnects.
+- [ ] The test runs without external services and cleans up broker/client resources reliably.
+
+---
+
 ## Issue Dependency Graph
 
 ```
@@ -1142,7 +1191,7 @@ Phase 1 (all packet issues #004–#012) ─────────────�
 Phase 2 (broker issues #013–#025e) ────────────────────────── depend on ──┘ (#003, #003a)
 Phase 3 (client issues #026–#031a) ────────────────────────── depend on ── (#003, #003a)
                                                                     │
-Phase 4 (#032–#036) ──────────────────────────────────────── depend on ── Phase 2 + 3
+Phase 4 (#032–#037) ──────────────────────────────────────── depend on ── Phase 2 + 3
 
 Broker spec-behavior dependencies:
 #025a (Maximum Packet Size) ───────────── depends on #003a, #014, #021
@@ -1153,6 +1202,9 @@ Broker spec-behavior dependencies:
 
 Client negotiated-limit dependencies:
 #031a (Enforce server limits) ─────────── depends on #026, #027, #028, #031
+
+Integration dependencies:
+#037 (Paho MQTT 5 QoS 1/2 broker interop) ─ depends on #007 and the Paho QoS 0 broker path
 ```
 
 Minimum viable path for a first working demo:
@@ -1173,6 +1225,6 @@ Minimum viable broker path using Paho MQTT as the initial test client:
    This lets Paho MQTT 5 clients connect, subscribe, publish QoS 0 messages, receive routed messages, and disconnect cleanly. It intentionally skips the amqtt MQTT 5 client issues (`#026–#031a`) because Paho is the test vehicle. It also skips QoS 1/2 acknowledgements until `#007` is implemented.
 
 3. **Paho QoS 1/2 broker demo:**
-   Add `#007` after the QoS 0 path.
+   Add `#007` after the QoS 0 path, then implement `#037`.
 
    This enables v5 PUBACK/PUBREC/PUBREL/PUBCOMP handling for Paho clients publishing or receiving QoS 1/2 messages.
