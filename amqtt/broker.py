@@ -219,6 +219,7 @@ class Broker:
         context.config = self.config
         namespace = plugin_namespace or "amqtt.broker.plugins"
         self.plugins_manager = PluginManager(namespace, context, self._loop)
+        self._is_topic_filtering_enabled = self.plugins_manager.is_topic_filtering_enabled()
 
     def _init_states(self) -> None:
         self.transitions = Machine(states=Broker.states, initial="new")
@@ -886,7 +887,7 @@ class Broker:
         :param action: What is being done with the topic?  subscribe or publish
         :return:
         """
-        if not self.plugins_manager.is_topic_filtering_enabled():
+        if not self._is_topic_filtering_enabled:
             return True
 
         results = await self.plugins_manager.map_plugin_topic(session=session, topic=topic, action=action)
