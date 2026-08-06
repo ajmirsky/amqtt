@@ -207,9 +207,10 @@ class PluginManager(Generic[C]):
     def _load_str_plugins(self, plugins_info: dict[str, Any]) -> None:
 
         self.logger.info("Loading plugins from config")
+        # DEPRECATED
         # legacy had a filtering 'enabled' flag, even if plugins were loaded/listed
-        self._is_topic_filtering_enabled = True
-        self._is_auth_filtering_enabled = True
+        self._is_topic_filtering_enabled = False
+        self._is_auth_filtering_enabled = False
         for plugin_path, plugin_config in plugins_info.items():
 
             plugin = self._load_str_plugin(plugin_path, plugin_config)
@@ -220,11 +221,13 @@ class PluginManager(Generic[C]):
                 if not iscoroutinefunction(plugin.authenticate):
                     msg = f"Auth plugin {plugin_path} has non-async authenticate method."
                     raise PluginCoroError(msg)
+                self._is_auth_filtering_enabled = True
                 self._auth_plugins.append(plugin)
             if isinstance(plugin, BaseTopicPlugin):
                 if not iscoroutinefunction(plugin.topic_filtering):
                     msg = f"Topic plugin {plugin_path} has non-async topic_filtering method."
                     raise PluginCoroError(msg)
+                self._is_topic_filtering_enabled = True
                 self._topic_plugins.append(plugin)
 
     def _load_str_plugin(self, plugin_path: str, plugin_cfg: dict[str, Any] | None = None) -> "BasePlugin[C]":

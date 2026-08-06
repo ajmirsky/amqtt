@@ -16,6 +16,20 @@ MIN_LOGGING_CONFIG = {
             'format': '[%(asctime)s] %(levelname)s %(name)s: %(message)s',
         },
     },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'level': 'INFO',
+            'formatter': 'default',
+            'stream': 'ext://sys.stdout',
+        },
+    },
+    'loggers': {
+        'amqtt.broker': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+        }
+    },
 }
 
 logging.config.dictConfig(MIN_LOGGING_CONFIG)
@@ -40,6 +54,7 @@ config: dict[str, Any] = {
 async def main_loop() -> None:
     broker = Broker(config)
     try:
+        print("Starting broker...")
         await broker.start()
         while True:
             await asyncio.sleep(1)
@@ -63,9 +78,9 @@ def __main__() -> None:
     try:
        loop.run_until_complete(task)
     except KeyboardInterrupt:
-        logger.info("KeyboardInterrupt received. Stopping server...")
+        print("KeyboardInterrupt received. Stopping server...")
     finally:
-        logger.info("Server stopped.")
+        print("Server stopped.")
         loop.close()
 
 if __name__ == "__main__":
