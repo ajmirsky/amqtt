@@ -107,7 +107,12 @@ class ExternalServer(Server):
 
 
 class BrokerContext(BaseContext):
-    """Used to provide the server's context as well as public methods for accessing internal state."""
+    """Broker runtime context passed to broker plugins.
+
+    Broker plugins use this object to inspect broker state, publish internal
+    messages, retain messages, and manage sessions or subscriptions without
+    reaching into the broker's private attributes.
+    """
 
     def __init__(self, broker: "Broker") -> None:
         super().__init__()
@@ -119,10 +124,12 @@ class BrokerContext(BaseContext):
         await self._broker_instance.internal_message_broadcast(topic, data, qos)
 
     async def retain_message(self, topic_name: str, data: bytes | bytearray, qos: int | None = None) -> None:
+        """Retain a message on behalf of the broker."""
         await self._broker_instance.retain_message(None, topic_name, data, qos)
 
     @property
     def sessions(self) -> Generator[Session]:
+        """All known broker sessions."""
         for session in self._broker_instance.sessions.values():
             yield session[0]
 
@@ -132,10 +139,12 @@ class BrokerContext(BaseContext):
 
     @property
     def retained_messages(self) -> dict[str, RetainedApplicationMessage]:
+        """Retained messages keyed by topic name."""
         return self._broker_instance.retained_messages
 
     @property
     def subscriptions(self) -> dict[str, list[tuple[Session, int]]]:
+        """Active subscriptions keyed by topic filter."""
         return self._broker_instance.subscriptions
 
     async def add_subscription(self, client_id: str, topic: str | None, qos: int | None) -> None:
@@ -146,7 +155,7 @@ class BrokerContext(BaseContext):
         """
         if client_id not in self._broker_instance.sessions:
             broker_handler, session = self._broker_instance.create_offline_session(client_id)
-            self._broker_instance._sessions[client_id] = (session, broker_handler)  # noqa: SLF001
+            self._broker_instance._sessions[client_id] = (session, broker_handler)  # ruff: ignore[private-member-access]
 
         if topic is not None and qos is not None:
             session, _ = self._broker_instance.sessions[client_id]
@@ -442,6 +451,8 @@ class Broker:
         remote_info = writer.get_peer_info()
         if remote_info is None:
             self.logger.warning("Remote info could not be retrieved from peer info")
+            await writer.close()  # python 3.10 needs explicit close
+            server.release_connection()
             return
 
         remote_address, remote_port = remote_info
@@ -480,13 +491,13 @@ class Broker:
             )
             raise AMQTTError(exc) from exc
         except MQTTError as exc:
-            self.logger.exception(
+            self.logger.warning(
                 f"Invalid connection from {format_client_message(address=remote_address, port=remote_port)}",
             )
             await writer.close()
             raise MQTTError(exc) from exc
         except NoDataError as exc:
-            self.logger.error(  # noqa: TRY400
+            self.logger.error(  # ruff: ignore[error-instead-of-exception]
                 f"No data from {format_client_message(address=remote_address, port=remote_port)} : {exc}",
             )
             raise AMQTTError(exc) from exc
@@ -543,9 +554,6 @@ class Broker:
     ) -> None:
         """Handle the lifecycle of a client session."""
         authenticated = await self._authenticate(client_session, self.listeners_config[listener_name])
-        if not authenticated:
-            await writer.close()
-            return
 
         if client_session.client_id is None:
             msg = "Client ID was not correctly created/set."
@@ -569,6 +577,11 @@ class Broker:
         self._sessions[client_session.client_id] = (client_session, handler)
 
         await handler.mqtt_connack_authorize(authenticated)
+
+        if not authenticated:
+            await writer.close()
+            return
+
         await self.plugins_manager.fire_event(BrokerEvents.CLIENT_CONNECTED,
                                               client_id=client_session.client_id,
                                               client_session=client_session)
@@ -801,7 +814,7 @@ class Broker:
         """
         returns = await self.plugins_manager.map_plugin_auth(session=session)
 
-        results = [result for _, result in returns.items() if result is not None] if returns else []
+        results = [result for result in returns.values() if result is not None] if returns else []
         if len(results) < 1:
             self.logger.debug("Authentication failed: no plugin responded with a boolean")
             return False

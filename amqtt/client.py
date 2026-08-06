@@ -6,7 +6,7 @@ from functools import wraps
 import logging
 import ssl
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import unquote, urlparse, urlunparse
 
 import websockets
 from websockets import HeadersLike, InvalidHandshake, InvalidURI
@@ -140,10 +140,11 @@ class MQTTClient:
                 initial connection (optional, used only with websocket connections)
 
         Returns:
-            [CONNACK](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718033)'s return code
+            CONNACK's successful return code (0x0)
 
         Raises:
-            ConnectError: could not connect to broker
+            ConnectError: if connect to broker fails or CONNACK contains non-zero (unsuccessful)
+            [`ConnectError.return_code`](https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc385349257)
 
         """
         additional_headers = additional_headers if additional_headers is not None else {}
@@ -236,8 +237,7 @@ class MQTTClient:
                 self.logger.warning(f"Reconnection attempt failed: {e!r}")
                 self.logger.debug("", exc_info=True)
                 if 0 <= reconnect_retries < nb_attempt:
-                    self.logger.exception("Maximum connection attempts reached. Reconnection aborted.")
-                    self.logger.debug("", exc_info=True)
+                    self.logger.debug("Maximum connection attempts reached. Reconnection aborted.", exc_info=e)
                     msg = "Too many failed attempts"
                     raise ConnectError(msg) from e
                 delay = min(reconnect_max_interval, 2**nb_attempt)
@@ -424,10 +424,10 @@ class MQTTClient:
         scheme = uri_attributes.scheme
         secure = scheme in ("mqtts", "wss")
         self.session.username = (
-            self.session.username or (str(uri_attributes.username) if uri_attributes.username else None)
+            self.session.username or (unquote(uri_attributes.username) if uri_attributes.username else None)
         )
         self.session.password = (
-            self.session.password or (str(uri_attributes.password) if uri_attributes.password else None)
+            self.session.password or (unquote(uri_attributes.password) if uri_attributes.password else None)
         )
         self.session.remote_address = str(uri_attributes.hostname) if uri_attributes.hostname else None
         self.session.remote_port = uri_attributes.port
@@ -468,6 +468,11 @@ class MQTTClient:
             if self.config.check_hostname is not None:
                 sc.check_hostname = self.config.check_hostname
                 sc.verify_mode = ssl.CERT_REQUIRED
+            if self.config.verify_cert is False:
+                if self.config.check_hostname:
+                    msg = "verify_cert cannot be disabled when check_hostname is enabled"
+                    raise ClientError(msg)
+                sc.verify_mode = ssl.CERT_NONE
             kwargs["ssl"] = sc
 
         try:

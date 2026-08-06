@@ -25,6 +25,7 @@ from amqtt.mqtt.publish import PublishPacket
 from amqtt.mqtt.pubrec import PubrecPacket
 from amqtt.mqtt.pubrel import PubrelPacket
 from amqtt.session import OutgoingApplicationMessage, Session
+from tests.asserts import assert_not_called_with_param
 
 # formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
 # logging.basicConfig(level=logging.DEBUG, format=formatter)
@@ -309,18 +310,6 @@ async def test_client_subscribe(broker, mock_plugin_manager, topic):
         ],
         any_order=True,
     )
-
-
-def assert_not_called_with_param(mock_obj, param_name=None, param_value=None):
-    """Asserts a specific param name or value was never passed to the mock."""
-    for args, kwargs in mock_obj.call_args_list:
-        # Check keyword arguments
-        if param_name in kwargs and kwargs[param_name] == param_value:
-            raise AssertionError(f"Mock was called with unexpected kwarg {param_name}={param_value}")
-
-        # Check positional arguments
-        if param_value in args and param_name is None:
-            raise AssertionError(f"Mock was called with unexpected positional arg {param_value}")
 
 
 @pytest.mark.asyncio
@@ -1185,3 +1174,14 @@ async def test_broker_with_absent_auth_plugin_filter():
     await mqtt_client.connect()
 
     await broker.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_client_without_peer_info(broker, mock_plugin_manager):
+    client = MQTTClient(config={'auto_reconnect':False})
+
+    # if the broker's stream writer for this client does not have peer info, the client should fail to connect
+    with patch.object(asyncio.streams.StreamWriter, 'get_extra_info', return_value=None) as mock_extra_info:
+        with pytest.raises(ConnectError):
+            await client.connect("mqtt://127.0.0.1/")
+            await asyncio.sleep(0.01)
