@@ -167,6 +167,36 @@ class ProtocolHandlerTest(unittest.TestCase):
 
         self.loop.run_until_complete(test_coro())
 
+    def test_mqtt_send_packet_writes_prebuilt_bytes(self):
+        async def test_coro() -> None:
+            session = Session()
+            session.keep_alive = 30
+            session.last_write_at = 0.0
+            writer = BufferWriter()
+            handler = ProtocolHandler(self.plugin_manager, session=session, loop=self.loop)
+            handler.writer = writer
+            handler._keepalive_watcher = asyncio.create_task(asyncio.sleep(60))
+
+            try:
+                packet = PublishPacket.build("/topic", b"test_data", None, False, QOS_0, False)
+                packet_data = packet.to_bytes()
+                packet.protocol_ts = None
+
+                before_send = self.loop.time()
+                await handler.mqtt_send_packet(packet_data, packet=packet)
+                after_send = self.loop.time()
+
+                assert writer.data == packet_data
+                assert writer.drained
+                assert packet.protocol_ts is not None
+                assert before_send <= session.last_write_at <= after_send
+            finally:
+                handler._keepalive_watcher.cancel()
+                with suppress(asyncio.CancelledError):
+                    await handler._keepalive_watcher
+
+        self.loop.run_until_complete(test_coro())
+
     def test_publish_qos0(self):
         async def server_mock(reader, writer) -> None:
             try:

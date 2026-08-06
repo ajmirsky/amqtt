@@ -13,6 +13,13 @@ except ImportError:
     class QueueShutDown(Exception):  # type: ignore[no-redef]  # ruff: ignore[error-suffix-on-exception-name]
         pass
 
+try:
+    from datetime import UTC, datetime
+except ImportError:
+    from datetime import datetime, timezone
+
+    UTC = timezone.utc
+
 
 import collections
 import itertools
@@ -134,7 +141,8 @@ class ProtocolHandler(Generic[C]):
                 self.handle_write_timeout()
 
     async def start(self) -> None:
-        if not self._is_attached():
+        session = self.session
+        if session is None:
             msg = "Handler is not attached to a stream"
             raise ProtocolHandlerError(msg)
         self._reader_ready = asyncio.Event()
@@ -142,7 +150,7 @@ class ProtocolHandler(Generic[C]):
         self._reader_task = asyncio.create_task(self._reader_loop())
         await self._reader_ready.wait()
         if self._loop is not None and self.keepalive_timeout is not None:
-            self.session.last_write_at = self._loop.time()
+            session.last_write_at = self._loop.time()
             self._keepalive_watcher = self._loop.create_task(self.timeout_watcher())
         self.logger.debug("Handler tasks started")
         await self._retry_deliveries()
@@ -576,6 +584,27 @@ class ProtocolHandler(Generic[C]):
             if self.writer:
                 async with self._write_lock:
                     await packet.to_stream(self.writer)
+            if self._keepalive_watcher and self.session is not None:
+                self.session.last_write_at = self._loop.time()
+            await self.plugins_manager.fire_event(MQTTEvents.PACKET_SENT, packet=packet, session=self.session)
+        except (ConnectionResetError, BrokenPipeError):
+            await self.handle_connection_closed()
+        except asyncio.CancelledError as e:
+            msg = "Packet handling was cancelled"
+            raise ProtocolHandlerError(msg) from e
+        except Exception as e:
+            self.logger.warning(f"Unhandled exception: {e}")
+            raise
+
+    async def mqtt_send_packet(self, packet_data: bytes, *, packet: PublishPacket | None = None) -> None:
+        """Send pre-serialized MQTT packet data."""
+        try:
+            if self.writer:
+                async with self._write_lock:
+                    self.writer.write(packet_data)
+                    await self.writer.drain()
+                    if packet is not None:
+                        packet.protocol_ts = datetime.now(UTC)
             if self._keepalive_watcher and self.session is not None:
                 self.session.last_write_at = self._loop.time()
             await self.plugins_manager.fire_event(MQTTEvents.PACKET_SENT, packet=packet, session=self.session)

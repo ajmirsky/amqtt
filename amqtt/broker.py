@@ -24,12 +24,13 @@ from amqtt.adapters import (
 from amqtt.contexts import Action, BaseContext, BrokerConfig, ListenerConfig, ListenerType
 from amqtt.errors import AMQTTError, BrokerError, MQTTError, NoDataError
 from amqtt.mqtt.protocol.broker_handler import BrokerProtocolHandler
-from amqtt.session import ApplicationMessage, OutgoingApplicationMessage, Session
+from amqtt.session import ApplicationMessage, Session
 from amqtt.utils import format_client_message, gen_client_id
 
 from .events import BrokerEvents
 from .mqtt.constants import QOS_0, QOS_1, QOS_2
 from .mqtt.disconnect import DisconnectPacket
+from .mqtt.publish import PublishPacket
 from .plugins.manager import PluginManager
 
 _BROADCAST: TypeAlias = dict[str, Session | str | bytes | bytearray | int | None]
@@ -217,7 +218,7 @@ class Broker:
         self._broadcast_shutdown_waiter: asyncio.Future[Any] = futures.Future()
 
         # Tasks queue for managing broadcasting tasks
-        self._tasks_queue: deque[asyncio.Task[OutgoingApplicationMessage]] = deque()
+        self._tasks_queue: deque[asyncio.Task[Any]] = deque()
 
         # Task for session monitor
         self._session_monitor_task: asyncio.Task[Any] | None = None
@@ -990,7 +991,7 @@ class Broker:
 
     async def _broadcast_loop(self) -> None:
         """Run the main loop to broadcast messages."""
-        running_tasks: deque[asyncio.Task[OutgoingApplicationMessage]] = self._tasks_queue
+        running_tasks: deque[asyncio.Task[Any]] = self._tasks_queue
 
         try:
             while True:
@@ -1024,9 +1025,10 @@ class Broker:
             if running_tasks:
                 await asyncio.gather(*running_tasks)
 
-    async def _run_broadcast(self, running_tasks: deque[asyncio.Task[OutgoingApplicationMessage]]) -> None:
+    async def _run_broadcast(self, running_tasks: deque[asyncio.Task[Any]]) -> None:
         """Process a single broadcast message."""
         broadcast = await self._broadcast_queue.get()
+        qos0_packet_data: tuple[PublishPacket, bytes] | None = None
 
         if self.logger.isEnabledFor(logging.DEBUG):  # avoid f-string evaluation if not needed
             self.logger.debug(f"Processing broadcast message: {broadcast}")
@@ -1071,14 +1073,29 @@ class Broker:
 
                 handler = self._get_handler(target_session)
                 if handler:
-                    task = asyncio.ensure_future(
-                        handler.mqtt_publish(
-                            broadcast["topic"],
-                            broadcast["data"],
-                            qos,
-                            retain=False,
-                        ),
-                    )
+                    task: asyncio.Task[Any]
+                    if qos == QOS_0:
+                        if qos0_packet_data is None:
+                            packet = PublishPacket.build(
+                                broadcast["topic"],
+                                bytes(broadcast["data"]),
+                                None,
+                                dup_flag=False,
+                                qos=QOS_0,
+                                retain=False,
+                            )
+                            qos0_packet_data = (packet, packet.to_bytes())
+                        packet, packet_data = qos0_packet_data
+                        task = asyncio.ensure_future(handler.mqtt_send_packet(packet_data, packet=packet))
+                    else:
+                        task = asyncio.ensure_future(
+                            handler.mqtt_publish(
+                                broadcast["topic"],
+                                broadcast["data"],
+                                qos,
+                                retain=False,
+                            ),
+                        )
                     running_tasks.append(task)
 
     async def _retain_broadcast_message(self, broadcast: dict[str, Any], qos: int, target_session: Session) -> None:

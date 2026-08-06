@@ -1053,14 +1053,14 @@ async def test_broker_broadcast_cancellation(broker):
     await sub_client.connect("mqtt://127.0.0.1")
     await sub_client.subscribe([(topic, qos)])
 
-    with patch.object(BrokerProtocolHandler, "mqtt_publish", side_effect=asyncio.CancelledError) as mocked_mqtt_publish:
+    with patch.object(BrokerProtocolHandler, "mqtt_send_packet", side_effect=asyncio.CancelledError) as mocked_mqtt_send_packet:
         await _client_publish(topic, data, qos)
 
-        # Second publish triggers the awaiting of first `mqtt_publish` task
+        # Second publish triggers the awaiting of first `mqtt_send_packet` task
         await _client_publish(topic, data, qos)
         await asyncio.sleep(0.01)
 
-        mocked_mqtt_publish.assert_awaited()
+        mocked_mqtt_send_packet.assert_awaited()
 
     # Ensure broadcast loop is still functional and can deliver the message
     await _client_publish(topic, data, qos)
