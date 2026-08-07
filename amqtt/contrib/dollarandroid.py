@@ -30,7 +30,9 @@ will raise AttributeError -- extend as needed.
 
 import os
 import time
+import warnings
 from collections import defaultdict
+from dataclasses import dataclass
 
 from amqtt.broker import BrokerContext
 from amqtt.plugins.base import BasePlugin
@@ -60,12 +62,7 @@ class Process:
         if 'SC_CLK_TCK' in os.sysconf_names:
             self._clk_tck = os.sysconf("SC_CLK_TCK")
 
-        try:
-            self._clk_tck = os.sysconf("SC_CLK_TCK")
-        except (ValueError, AttributeError, OSError):
-            self._clk_tck = 100  # typical Linux default
-
-    def _read_cpu_times(self):
+    def _read_cpu_times(self) -> tuple[float, float]:
         """Return (utime, stime) in seconds, read from /proc/<pid>/stat."""
         with open(f"/proc/{self.pid}/stat", "r", encoding="utf-8", errors="replace") as f:
             raw = f.read()
@@ -76,9 +73,9 @@ class Process:
         # fields[0] == state (field 3 overall); utime is field 14, stime field 15
         utime_ticks = int(fields[11])
         stime_ticks = int(fields[12])
-        return (utime_ticks / self._clk_tck, stime_ticks / self._clk_tck)
+        return utime_ticks / self._clk_tck, stime_ticks / self._clk_tck
 
-    def cpu_percent(self, interval=0):
+    def cpu_percent(self) -> float:
         """
         Mirrors psutil's non-blocking usage pattern (interval=0 / None):
         compares CPU time consumed since the previous call against wall
@@ -86,8 +83,8 @@ class Process:
         exactly like real psutil ("meaningless value ... supposed to
         ignore" per psutil's own docs).
         """
-        if interval:
-            time.sleep(interval)
+        if self._clk_tck is None:
+            return 0.0
 
         cpu_time = sum(self._read_cpu_times())
         now = time.monotonic()
@@ -137,6 +134,34 @@ def cpu_count(logical=True):
 class AndroidSysPlugin(BasePlugin[BrokerContext]):
     def __init__(self, context: BrokerContext) -> None:
         super().__init__(context)
+
         # Broker statistics initialization
         self.stats: defaultdict[str, int] = defaultdict(int)
+        self.process_handle = Process()
+        self.sys_broadcast_task = None
+        self.sys_interval = self._get_config_option("sys-interval", 0)
 
+    def on_broker_pre_start(self) -> None:
+        self.stats.clear()
+
+    def on_broker_post_start(self) -> None:
+        self.process_handle = Process()
+
+        self.context.logger.debug(f"Setup $SYS broadcasting every {self.sys_interval} seconds")
+        if not self.context.loop or self.sys_interval <= 0:
+            warnings.warn("AndroidSysPlugin: $SYS broadcasting disabled or invalid interval")
+            return
+
+        self.sys_broadcast_task = self.context.loop.call_later(self.sys_interval, self.broadcast_dollar_sys_topics)
+
+    def broadcast_dollar_sys_topics(self) -> None:
+        """Gather current states of cpu and memroy and broadcast $SYS topics updates."""
+
+        # reschedule task for next execution
+        self.sys_broadcast_task = self.context.loop.call_later(self.sys_interval, self.broadcast_dollar_sys_topics)
+
+    @dataclass
+    class Config:
+        """Configuration struct for plugin."""
+        sys_interval: int = 20
+        """samping and sending interval in seconds"""
