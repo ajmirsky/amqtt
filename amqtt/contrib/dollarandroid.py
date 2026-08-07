@@ -30,10 +30,14 @@ will raise AttributeError -- extend as needed.
 
 import os
 import time
+from collections import defaultdict
+
+from amqtt.broker import BrokerContext
+from amqtt.plugins.base import BasePlugin
 
 
-class _MemInfo:
-    """Minimal stand-in for psutil's pmem/pfullmem namedtuple. Only .rss is populated."""
+class MemInfo:
+    """Corollary to psutil's pmem/pfullmem namedtuple. Only .rss is populated."""
 
     __slots__ = ("rss",)
 
@@ -41,16 +45,21 @@ class _MemInfo:
         self.rss = rss_bytes
 
     def __repr__(self):
-        return f"_MemInfo(rss={self.rss})"
+        return f"MemInfo(rss={self.rss})"
 
 
 class Process:
-    """Minimal stand-in for psutil.Process, current-process only."""
+    """Corollary to psutil.Process, current-process only."""
 
     def __init__(self, pid=None):
         self.pid = pid if pid is not None else os.getpid()
         self._last_cpu_time = None
         self._last_wall_time = None
+        self._clk_tck = None
+
+        if 'SC_CLK_TCK' in os.sysconf_names:
+            self._clk_tck = os.sysconf("SC_CLK_TCK")
+
         try:
             self._clk_tck = os.sysconf("SC_CLK_TCK")
         except (ValueError, AttributeError, OSError):
@@ -114,7 +123,7 @@ class Process:
                     # format: "VmRSS:\t   12345 kB"
                     rss_kb = int(line.split()[1])
                     break
-        return _MemInfo(rss_bytes=rss_kb * 1024)
+        return MemInfo(rss_bytes=rss_kb * 1024)
 
 
 def cpu_count(logical=True):
@@ -123,3 +132,11 @@ def cpu_count(logical=True):
         return os.cpu_count() or 1
     except Exception:
         return 1
+
+
+class AndroidSysPlugin(BasePlugin[BrokerContext]):
+    def __init__(self, context: BrokerContext) -> None:
+        super().__init__(context)
+        # Broker statistics initialization
+        self.stats: defaultdict[str, int] = defaultdict(int)
+
