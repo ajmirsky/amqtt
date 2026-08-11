@@ -167,3 +167,87 @@ The two package builds were bit-for-bit identical:
    change defaults/document secure-by-default profiles.
 9. Tighten input validation, especially MQTT UTF-8 string rejection, then
     document the validation model.
+
+## Coverage Work To Reach 90% Statement Coverage
+
+Current statement coverage is 85.7%: 5,988 statements, 854 missed statements.
+To get above 90%, at least 256 currently missed statements need coverage. Target
+about 300 statements for buffer.
+
+1. Fix and expand authentication plugin tests.
+   Convert the async auth tests from `unittest.TestCase` methods to pytest async
+   tests so they actually execute. Cover anonymous auth allow/deny cases,
+   password-file parsing for comments, blank lines, malformed lines, missing
+   files, unsupported hashes, valid passwords, and password mismatches. Cover
+   `DeprecatedSHA512CryptHasher` identify, verify, and error paths.
+
+2. Add legacy auth DB hasher tests.
+   Cover `LegacyPasslibScryptHasher` and `LegacyPasslibPBKDF2Hasher`. Test
+   valid verification, invalid formats, invalid params, bad base64, byte
+   decoding errors, `hash()` raising `NotImplementedError`, and
+   `check_needs_rehash`.
+
+3. Add protocol handler unit tests.
+   Cover `_send_packet()` error paths for no writer, reset or broken pipe,
+   cancellation, and generic exceptions. Cover delivery queue edge cases for no
+   session, detached session, cancellation, and runtime errors. Cover base
+   `handle_*` methods with missing sessions, unknown packet-id handling for
+   puback, pubrec, pubrel, and pubcomp, and dispatch paths for packet types that
+   are not currently exercised.
+
+4. Add broker protocol handler tests.
+   Cover malformed CONNECT packets with missing variable headers, missing
+   payloads, no client IDs, invalid flags, bad protocol names or versions, and
+   password-without-username cases. Cover subscribe and unsubscribe packets with
+   missing headers or payloads, disconnect waiter behavior, subscription queue
+   helpers, and CONNACK authorization accepted and rejected paths.
+
+5. Fill client and context edge cases.
+   Cover client reconnect failure loops, cancellation, disconnect early returns,
+   task cancellation, and TLS config validation. Cover context config validation
+   for invalid QoS values, cert/key mismatches, and malformed listener/client
+   configs.
+
+
+---
+
+1. amqtt/mqtt/protocol/broker_handler.py
+     39 missed statements. Add unit tests for malformed CONNECT/SUBSCRIBE/UNSUBSCRIBE packets:
+      - missing variable header
+      - missing payload
+      - empty client id with clean_session=False
+      - bad protocol name/version
+      - username/password flag inconsistencies
+      - subscription/unsubscription queue helpers
+      - disconnect waiter behavior
+
+  2. amqtt/contexts.py
+     38 missed statements. Add config validation tests:
+      - invalid QoS values
+      - listener cert/key mismatch
+      - client cert/key mismatch
+      - will config validation
+      - legacy config translation paths
+      - plugin config normalization
+
+  3. amqtt/plugins/manager.py
+     27 missed statements. Add direct unit tests for:
+      - plugin import/load errors
+      - non-coroutine event handlers
+      - disabled auth/topic plugin paths
+      - plugin close/auth/topic mapping exception handling
+      - config hydration for dict/dataclass plugin configs
+
+  4. amqtt/client.py
+     55 missed statements, but more effort. Useful tests:
+      - reconnect failure loop
+      - cancellation paths
+      - disconnect early returns
+      - task cancellation
+      - TLS config validation branches
+
+  5. amqtt/broker.py
+     79 missed statements, highest count but more setup. I’d only target compact helper/error paths unless needed.
+
+  Fastest path: add broker handler edge tests + a few context validation tests. That should clear the remaining 41-statement gap without touching the heavier broker/client integration
+  paths.

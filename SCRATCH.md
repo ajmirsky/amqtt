@@ -152,3 +152,12 @@ coordinate."
     Due to the removal of Python's standard library `crypt` module in Python 3.13 and the no-longer-supported `passlib` library, `pbkdf2_sha256` and `scrypt` have been deprecated, in favor of `argon2` or `bcrypt`.
 
     Deprecation include updating the password hash to `argon2` upon successfully verifying a password encrypted with `pbkdf2_sha256` or `scrypt`. As all hashes are one-way, it _cannot_ do a full migration of all passwords; only the passwords that are verified, where the original password is provided, can be hashed with the new scheme.   
+
+
+2. amqtt/contrib/auth_db/plugin.py:31, 75 — two engines per plugin
+Confirmed. Both UserAuthDBPlugin and TopicAuthDBPlugin build a UserManager/TopicManager (each of which calls create_async_engine internally at managers.py:25 / :134) and a plugin-owned self._engine against the same DSN. The plugin engine is used only for create_all in on_broker_pre_start — which the managers already expose as db_sync() (managers.py:40, :149). The new close() methods now have to dispose both pools.
+
+3. amqtt/contrib/auth_db/topic_mgr_cli.py:56 — wrong manager class
+Confirmed. db_sync uses UserManager; the other three commands in the file (list_clients:72, add_topic_allowance:96, remove_topic_allowance:127) use TopicManager. Pre-existing, but this branch rewrote that exact line into the async with form and carried the wrong class forward. Harmless today since both share Base.metadata, but it'd break silently if the declarative bases are ever split.
+
+No correctness blockers found. Want me to apply all three? #1 and #3 are one-liners; #2 means dropping self._engine from both plugins and switching on_broker_pre_start to await self._{user,topic}_mana
