@@ -317,11 +317,11 @@ Source: https://www.bestpractices.dev/en/projects/13571/baseline-1
 | OSPS-AC-02.01 | Met | The project is hosted on GitHub. Collaborator access is not granted automatically; a repository administrator must explicitly invite a person or team and choose the repository role to grant. The project follows least privilege: contributors use forks and pull requests by default, and elevated permissions such as Write, Maintain, or Admin are granted manually only when needed for the contributor's role. |
 | OSPS-AC-03.01 | Met | The primary branch is main. GitHub branch protection/rulesets prevent direct commits to main; changes must be proposed through pull requests before being merged. |
 | OSPS-AC-03.02 | Met | The primary branch is main. GitHub branch protection/rulesets protect main from deletion and require explicit privileged action to change protected branch settings. |
-| OSPS-BR-01.01 | Unmet | Fixed with PR: https://github.com/Yakifo/amqtt/pull/346 |
-| OSPS-BR-01.03 | Unmet | Fixed with PR: https://github.com/Yakifo/amqtt/pull/346 |
+| OSPS-BR-01.01 | Met | CI workflows validate untrusted GitHub metadata before use. The workflows check base refs, head refs, ref names, and release tag formats before downstream CI/CD jobs run. |
+| OSPS-BR-01.03 | Met | CI workflows that operate on untrusted pull request code run with restricted token permissions and do not persist checkout credentials. Privileged credentials and assets are not exposed to untrusted code snapshots. |
 | OSPS-BR-03.01 | Met | Official project channels use encrypted HTTPS URLs: https://amqtt.io, https://github.com/Yakifo/amqtt, https://amqtt.readthedocs.io/, and https://pypi.org/project/amqtt/. |
 | OSPS-BR-03.02 | Met | Distribution channels use HTTPS exclusively. |
-| OSPS-BR-07.01 | Unmet | Fixed with PR: https://github.com/Yakifo/amqtt/pull/346 |
+| OSPS-BR-07.01 | Met | The project uses Gitleaks secret scanning through pre-commit and CI to detect hardcoded secrets, credentials, private keys, and similar sensitive data before they are stored in version control. |
 | OSPS-DO-01.01 | Met | User documentation for basic functionality is published at https://amqtt.readthedocs.io/ and includes quickstart, broker/client usage, configuration, and CLI reference documentation. |
 | OSPS-DO-02.01 | Met | Defect reporting is documented in the README: users are directed to open GitHub issues at https://github.com/Yakifo/amqtt/issues/new for bugs, patches, and suggestions. |
 | OSPS-GV-02.01 | Met | GitHub supports public discussions on proposed changes through pull requests and usage obstacles through issues. |
@@ -337,16 +337,6 @@ Source: https://www.bestpractices.dev/en/projects/13571/baseline-1
 | OSPS-QA-05.01 | Met | The repository does not track generated executable artifacts; builds, distributions, caches, and compiled outputs are excluded from version control. |
 | OSPS-QA-05.02 | Met | The repository does not track unreviewable binary artifacts such as executables, compiled libraries, wheels, archives, or generated application binaries. |
 | OSPS-VM-02.01 | Met | Security contacts and private vulnerability reporting instructions are documented in SECURITY.md: https://github.com/Yakifo/amqtt/blob/main/SECURITY.md. |
-
-### Post-Merge Updates for Unmet Entries
-
-Use these replacement entries after https://github.com/Yakifo/amqtt/pull/346 is merged to `main`.
-
-| Criterion | Status | Justification |
-|---|---|---|
-| OSPS-BR-01.01 | Met | CI workflows validate untrusted GitHub metadata before use. The workflows check base refs, head refs, ref names, and release tag formats before downstream CI/CD jobs run. |
-| OSPS-BR-01.03 | Met | CI workflows that operate on untrusted pull request code run with restricted token permissions and do not persist checkout credentials. Privileged credentials and assets are not exposed to untrusted code snapshots. |
-| OSPS-BR-07.01 | Met | The project uses Gitleaks secret scanning through pre-commit and CI to detect hardcoded secrets, credentials, private keys, and similar sensitive data before they are stored in version control. |
 
 ## OpenSSF Baseline Level 2 Badge Entries
 
