@@ -48,10 +48,6 @@ def test_config(rsa_keys):
                 "ssl": True,
                 'certfile': certfile,
                 'keyfile': keyfile},
-        },
-        "sys_interval": 0,
-        "auth": {
-            "allow-anonymous": True,
         }
     }
 
@@ -92,14 +88,14 @@ def mock_plugin_manager():
 
 @pytest.fixture
 async def broker_fixture(test_config):
-    with pytest.warns(DeprecationWarning):
-        broker = Broker(test_config, plugin_namespace="amqtt.test.plugins")
-        await broker.start()
-        assert broker.transitions.is_started()
-        assert broker._sessions == {}
-        assert "default" in broker._servers
 
-        yield broker
+    broker = Broker(test_config, plugin_namespace="amqtt.test.plugins")
+    await broker.start()
+    assert broker.transitions.is_started()
+    assert broker._sessions == {}
+    assert "default" in broker._servers
+
+    yield broker
 
     if not broker.transitions.is_stopped():
         await broker.shutdown()

@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -138,7 +137,7 @@ async def test_client_broker_cert_authentication(ca_creds, server_creds, device_
 
     client_config = {
         'auto_reconnect': False,
-        'broker': {
+        'connection': {
             'cafile': ca_crt,
             'certfile': device_crt,
             'keyfile': device_key

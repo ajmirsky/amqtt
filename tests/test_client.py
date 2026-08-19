@@ -7,8 +7,10 @@ import pytest
 
 from amqtt.broker import Broker
 from amqtt.client import MQTTClient
+from amqtt.contexts import ClientConfig
 from amqtt.errors import ClientError, ConnectError, MQTTError
 from amqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
+from dacite import UnexpectedDataError
 
 formatter = "[%(asctime)s] %(name)s {%(filename)s:%(lineno)d} %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.ERROR, format=formatter)
@@ -484,41 +486,24 @@ async def test_connect_timeout():
 
 async def test_client_no_auth():
 
-    class MockEntryPoints:
-
-        def select(self, group) -> list[EntryPoint]:
-            match group:
-                case 'tests.mock_plugins':
-                    return [
-                            EntryPoint(name='auth_plugin', group='tests.mock_plugins', value='tests.plugins.mocks:TestNoAuthPlugin'),
-                        ]
-                case _:
-                    return list()
-
-
-    with patch("amqtt.plugins.manager.entry_points", side_effect=MockEntryPoints) as mocked_mqtt_publish:
-
-        config = {
-            "listeners": {
-                "default": {"type": "tcp", "bind": "127.0.0.1:1883", "max_connections": 10},
-            },
-            'sys_interval': 1,
-            'auth': {
-                'plugins': ['auth_plugin', ]
-            }
+    config = {
+        "listeners": {
+            "default": {"type": "tcp", "bind": "127.0.0.1:1883", "max_connections": 10},
+        },
+        'plugins': {
+            'tests.plugins.mocks.TestNoAuthPlugin': {}
         }
+    }
 
-        client = MQTTClient(client_id="client1", config={'auto_reconnect': False})
+    client = MQTTClient(client_id="client1", config={'auto_reconnect': False})
 
-        with pytest.warns(DeprecationWarning):
+    broker = Broker(plugin_namespace='tests.mock_plugins', config=config)
+    await broker.start()
 
-            broker = Broker(plugin_namespace='tests.mock_plugins', config=config)
-            await broker.start()
+    with pytest.raises(ConnectError):
+        await client.connect("mqtt://127.0.0.1:1883/")
 
-            with pytest.raises(ConnectError):
-                await client.connect("mqtt://127.0.0.1:1883/")
-
-            await broker.shutdown()
+    await broker.shutdown()
 
 
 @pytest.mark.asyncio
@@ -533,3 +518,19 @@ async def test_publish_to_incorrect_wildcard(broker_fixture):
 
     await client.publish("topic/*", b'asterisk topic normal publish')
     await client.disconnect()
+
+
+def test_retired_client_config_options():
+
+    client_config = {
+        'auto_reconnect': False,
+        'broker': {
+            'cafile': "wrong_ca_crt",
+            'certfile': "device_crt",
+            'keyfile': "device_key",
+        }
+    }
+
+
+    with pytest.raises(UnexpectedDataError, match="broker"):
+        _ = ClientConfig.from_dict(client_config)

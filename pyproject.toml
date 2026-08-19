@@ -148,27 +148,6 @@ source = "vcs"
 [tool.hatch.publish.indexes.testpypi]
 url = "https://test.pypi.org/legacy/"
 
-# ___________________________________ PLUGINS __________________________________
-[project.entry-points."amqtt.test.plugins"]
-test_plugin = "tests.plugins.test_manager:EmptyTestPlugin"
-event_plugin = "tests.plugins.test_manager:EventTestPlugin"
-packet_logger_plugin = "amqtt.plugins.logging_amqtt:PacketLoggerPlugin"
-
-# --8<-- [start:included]
-[project.entry-points."amqtt.broker.plugins"]
-event_logger_plugin = "amqtt.plugins.logging_amqtt:EventLoggerPlugin"
-packet_logger_plugin = "amqtt.plugins.logging_amqtt:PacketLoggerPlugin"
-auth_anonymous = "amqtt.plugins.authentication:AnonymousAuthPlugin"
-auth_file = "amqtt.plugins.authentication:FileAuthPlugin"
-topic_taboo = "amqtt.plugins.topic_checking:TopicTabooPlugin"
-topic_acl = "amqtt.plugins.topic_checking:TopicAccessControlListPlugin"
-broker_sys = "amqtt.plugins.sys.broker:BrokerSysPlugin"
-# --8<-- [end:included]
-
-
-[project.entry-points."amqtt.client.plugins"]
-packet_logger_plugin = "amqtt.plugins.logging_amqtt:PacketLoggerPlugin"
-
 # ____________________________________ RUFF ____________________________________
 # https://docs.astral.sh/ruff/settings/
 [tool.ruff]

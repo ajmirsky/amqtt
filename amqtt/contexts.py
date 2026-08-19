@@ -165,21 +165,10 @@ class BrokerConfig(Dictable):
     """Network of listeners used by the services. a 'default' named listener is required; if another listener
      does not set a value, the 'default' settings are applied. See
      [`ListenerConfig`](broker_config.md#amqtt.contexts.ListenerConfig) for more information."""
-    sys_interval: int | None = None
-    """*Deprecated field to configure the `BrokerSysPlugin`. See [`BrokerSysPlugin`](../plugins/packaged_plugins.md#sys-topics)
-    for recommended configuration.*"""
     timeout_disconnect_delay: int | None = 0
     """Client disconnect timeout without a keep-alive."""
     session_expiry_interval: int | None = None
     """Seconds for an inactive session to be retained."""
-    auth: dict[str, Any] | None = None
-    """*Deprecated field used to config EntryPoint-loaded plugins. See
-    [`AnonymousAuthPlugin`](../plugins/packaged_plugins.md#anonymous-auth-plugin) and
-    [`FileAuthPlugin`](../plugins/packaged_plugins.md#password-file-auth-plugin) for recommended configuration.*"""
-    topic_check: dict[str, Any] | None = None
-    """*Deprecated field used to config EntryPoint-loaded plugins. See
-    [`TopicTabooPlugin`](../plugins/packaged_plugins.md#taboo-topic-plugin) and
-    [`TopicACLPlugin`](../plugins/packaged_plugins.md#acl-topic-plugin) for recommended configuration method.*"""
     plugins: dict[str, Any] | list[str | dict[str, Any]] | None = field(default_factory=default_broker_plugins)
     """The dictionary has a key of the dotted-module path of a class derived from `BasePlugin`, `BaseAuthPlugin`
      or `BaseTopicPlugin`; the value is a dictionary of configuration options for that plugin. See
@@ -188,14 +177,6 @@ class BrokerConfig(Dictable):
 
     def __post_init__(self) -> None:
         """Check config for errors and transform fields for easier use."""
-        if self.sys_interval is not None:
-            warnings.warn("sys_interval is deprecated, use 'plugins' to define configuration",
-                          DeprecationWarning, stacklevel=1)
-
-        if self.auth is not None or self.topic_check is not None:
-            warnings.warn("'auth' and 'topic-check' are deprecated, use 'plugins' to define configuration",
-                          DeprecationWarning, stacklevel=1)
-
         default_listener = self.listeners["default"]
         for listener_name, listener in self.listeners.items():
             if listener_name == "default":
@@ -338,8 +319,6 @@ class ClientConfig(Dictable):
     """Upon reconnect, should subscriptions be cleared. Can be overridden by `MQTTClient.connect`"""
     topics: dict[str, TopicConfig] | None = field(default_factory=dict)
     """Specify the topics and what flags should be set for messages published to them."""
-    broker: ConnectionConfig | None = None
-    """*Deprecated* Configuration for connecting to the broker. Use `connection` field instead."""
     connection: ConnectionConfig = field(default_factory=ConnectionConfig)
     """Configuration for connecting to the broker. See
      [`ConnectionConfig`](client_config.md#amqtt.contexts.ConnectionConfig) for more information."""
@@ -361,12 +340,6 @@ class ClientConfig(Dictable):
         if self.default_qos is not None and (self.default_qos < QOS_0 or self.default_qos > QOS_2):
             msg = "Client config: default QoS must be 0, 1 or 2."
             raise ValueError(msg)
-
-        if self.broker is not None:
-            warnings.warn("The 'broker' option is deprecated, please use 'connection' instead. "
-                          "Support for 'broker' will be removed in a future release.",
-                          DeprecationWarning, stacklevel=2)
-            self.connection = self.broker
 
         if bool(not self.connection.keyfile) ^ bool(not self.connection.certfile):
             msg = "Connection key and certificate files are _both_ required."

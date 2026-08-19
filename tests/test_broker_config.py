@@ -12,7 +12,7 @@ except ImportError:
     class StrEnum(str, Enum):  #type: ignore[no-redef]
         pass
 
-from dacite import from_dict, Config
+from dacite import from_dict, Config, UnexpectedDataError
 
 from amqtt.contexts import BrokerConfig, ClientConfig, ConnectionConfig, ListenerConfig, ListenerType, TopicConfig, WillConfig
 
@@ -45,25 +45,6 @@ def test_broker_config_from_dict_none_uses_defaults() -> None:
 
     assert "default" in broker_config.listeners
     assert broker_config.plugins is not None
-
-
-def test_broker_config_from_dict_normalizes_topic_check_and_plugin_lists() -> None:
-    broker_config = BrokerConfig.from_dict(
-        {
-            "listeners": {"default": {"bind": "127.0.0.1:1883"}},
-            "topic-check": {"enabled": True},
-            "plugins": [
-                "amqtt.plugins.authentication.AnonymousAuthPlugin",
-                {"amqtt.plugins.topic_checking.TopicTabooPlugin": {"topic": "prohibited"}},
-            ],
-        },
-    )
-
-    assert broker_config.topic_check == {"enabled": True}
-    assert broker_config.plugins == {
-        "amqtt.plugins.authentication.AnonymousAuthPlugin": {},
-        "amqtt.plugins.topic_checking.TopicTabooPlugin": {"topic": "prohibited"},
-    }
 
 
 def test_listener_config_requires_certfile_and_keyfile_together(tmp_path: Path) -> None:
@@ -166,3 +147,20 @@ def test_client_config_rejects_mismatched_connection_cert_and_key() -> None:
 
     with pytest.raises(ValueError, match="both"):
         ClientConfig(connection=connection)
+
+def test_retired_config_options():
+    with pytest.raises(UnexpectedDataError, match="topic_check"):
+        _ = BrokerConfig.from_dict(
+            {
+                "listeners": {"default": {"bind": "127.0.0.1:1883"}},
+                "topic-check": {"enabled": True},
+            }
+        )
+
+    with pytest.raises(UnexpectedDataError, match="sys_interval"):
+        _ = BrokerConfig.from_dict(
+            {
+                "listeners": {"default": {"bind": "127.0.0.1:1883"}},
+                "sys_interval": 1,
+            }
+        )
