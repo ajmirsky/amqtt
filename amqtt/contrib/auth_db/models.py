@@ -14,7 +14,6 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from amqtt.contexts import Action
 from amqtt.contrib import DataClassListJSON
-from amqtt.contrib.auth_db.hasher import LegacyPasslibPBKDF2Hasher, LegacyPasslibScryptHasher
 from amqtt.plugins import TopicMatcher
 
 logger = logging.getLogger(__name__)
@@ -113,21 +112,9 @@ class PasswordHasher(PasswordHash):
         if not schemes:
             schemes = ("argon2", "bcrypt")
 
-        if "pbkdf2_sha256" in schemes or "scrypt" in schemes:
-            warnings.warn(
-                "'pbkdf2_sha256' and 'scrypt' are deprecated. Existing passwords will be verified and upgraded "
-                "to Argon2 on the next password change.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            if "argon2" not in schemes:
-                schemes = ("argon2", *schemes)
-
         hash_scheme_map: dict[str, type[HasherProtocol]] = {
             "argon2": Argon2Hasher,
             "bcrypt": BcryptHasher,
-            "pbkdf2_sha256": cast("type[HasherProtocol]", LegacyPasslibPBKDF2Hasher),
-            "scrypt": cast("type[HasherProtocol]", LegacyPasslibScryptHasher),
         }
 
         try:

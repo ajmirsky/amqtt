@@ -114,7 +114,7 @@ class BrokerSysPlugin(BasePlugin[BrokerContext]):
         await self.context.retain_message(DOLLAR_SYS_ROOT + "version", version.encode())
 
         # Start $SYS topics management
-        self._sys_interval = self._get_config_option("sys_interval", None)
+        self._sys_interval = self.config.sys_interval
 
         if not self._sys_interval:
             self.context.logger.warning("'sys_interval' key is not set or is None")

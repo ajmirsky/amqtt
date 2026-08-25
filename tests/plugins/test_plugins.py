@@ -90,7 +90,6 @@ async def test_plugin_exception_while_init() -> None:
         "listeners": {
             "default": {"type": "tcp", "bind": "127.0.0.1:1883", "max_connections": 10},
         },
-        'sys_interval': 1,
         'plugins':{
             'tests.plugins.test_plugins.MockInitErrorPlugin':{}
         }
@@ -107,7 +106,6 @@ async def test_plugin_exception_while_loading() -> None:
         "listeners": {
             "default": {"type": "tcp", "bind": "127.0.0.1:1883", "max_connections": 10},
         },
-        'sys_interval': 1,
         'plugins':{
             'tests.plugins.mock_plugins.MockImportErrorPlugin':{}
         }
@@ -146,7 +144,6 @@ async def test_all_plugin_events():
         "listeners": {
             "default": {"type": "tcp", "bind": "127.0.0.1:1883", "max_connections": 10},
         },
-        'sys_interval': 1,
         'plugins':{
             'amqtt.plugins.authentication.AnonymousAuthPlugin': {},
             'tests.plugins.test_plugins.AllEventsPlugin': {}
@@ -206,7 +203,6 @@ async def test_retained_message_plugin_event():
         "listeners": {
             "default": {"type": "tcp", "bind": "127.0.0.1:1883", "max_connections": 10},
         },
-        'sys_interval': 1,
         'plugins':[{'amqtt.plugins.authentication.AnonymousAuthPlugin': {'allow_anonymous': False}},
                    {'tests.plugins.test_plugins.RetainedMessageEventPlugin': {}}]
         }

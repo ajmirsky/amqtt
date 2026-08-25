@@ -29,15 +29,6 @@ class TopicAccessControlListPlugin(BaseTopicPlugin):
     def __init__(self, context: BaseContext) -> None:
         super().__init__(context)
 
-        if self._get_config_option("acl", None):
-            warnings.warn("The 'acl' option is deprecated, please use 'subscribe-acl' instead. "
-                          "Support will dropped in future versions.",
-                          DeprecationWarning, stacklevel=1)
-
-        if self._get_config_option("acl", None) and self._get_config_option("subscribe-acl", None):
-            msg = "'acl' has been replaced with 'subscribe-acl'; only one may be included"
-            raise PluginInitError(msg)
-
     @staticmethod
     def topic_ac(topic_requested: str, topic_allowed: str) -> bool:
         req_split = topic_requested.split("/")
@@ -66,7 +57,7 @@ class TopicAccessControlListPlugin(BaseTopicPlugin):
             return False
 
         # hbmqtt and older amqtt do not support publish filtering
-        if action == Action.PUBLISH and not self._get_config_option("publish-acl", {}):
+        if action == Action.PUBLISH and not self.config.publish_acl:
             # maintain backward compatibility, assume permitted
             return True
 
@@ -81,11 +72,11 @@ class TopicAccessControlListPlugin(BaseTopicPlugin):
         acl: dict[str, Any] | None = None
         match action:
             case Action.PUBLISH:
-                acl = self._get_config_option("publish-acl", None)
+                acl = self.config.publish_acl
             case Action.SUBSCRIBE:
-                acl = self._get_config_option("subscribe-acl", self._get_config_option("acl", None))
+                acl = self.config.subscribe_acl
             case Action.RECEIVE:
-                acl = self._get_config_option("receive-acl", None)
+                acl = self.config.receive_acl
             case _:
                 msg = "Received an invalid action type."
                 raise ValueError(msg)
@@ -104,4 +95,5 @@ class TopicAccessControlListPlugin(BaseTopicPlugin):
         """Mappings of username and list of approved topics."""
 
         publish_acl: dict[str, list[str]] = field(default_factory=dict)
-        acl: dict[str, list[str]] = field(default_factory=dict)
+        subscribe_acl: dict[str, list[str]] = field(default_factory=dict)
+        receive_acl: dict[str, list[str]] = field(default_factory=dict)

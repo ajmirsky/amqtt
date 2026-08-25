@@ -23,8 +23,7 @@ class BasePlugin(Generic[C]):
 
     config (self.Config):
         An instance of the Config dataclass defined by the plugin (or an empty dataclass, if not
-        defined). If using entrypoint- or mixed-style configuration, use `_get_config_option()`
-        to access the variable.
+        defined).
 
     """
 
@@ -32,30 +31,6 @@ class BasePlugin(Generic[C]):
         self.context: C = context
         # since the PluginManager will hydrate the config from a plugin's `Config` class, this is a safe cast
         self.config = cast("self.Config", context.config)  # type: ignore[name-defined]
-
-    # Deprecated: included to support entrypoint-style configs. Replaced by dataclass Config class.
-    def _get_config_section(self, name: str) -> dict[str, Any] | None:
-
-        if not self.context.config or not hasattr(self.context.config, "get") or not self.context.config.get(name, None):
-            return None
-
-        section_config: int | dict[str, Any] | None = self.context.config.get(name, None)
-        # mypy has difficulty excluding int from `config`'s type, unless there's an explicit check
-        if isinstance(section_config, int):
-            return None
-        return section_config
-
-    # Deprecated : supports entrypoint-style configs as well as dataclass configuration.
-    def _get_config_option(self, option_name: str, default: Any = None) -> Any:
-        if not self.context.config:
-            return default
-
-        if is_dataclass(self.context.config):
-            # overloaded context.config for BasePlugin `Config` class, so ignoring static type check
-            return getattr(self.context.config, option_name.replace("-", "_"), default)
-        if option_name in self.context.config:
-            return self.context.config[option_name]
-        return default
 
     @dataclass
     class Config:
@@ -71,22 +46,6 @@ class BaseTopicPlugin(BasePlugin[BaseContext]):
     def __init__(self, context: BaseContext) -> None:
         super().__init__(context)
 
-        self.topic_config: dict[str, Any] | None = self._get_config_section("topic-check")
-        if not bool(self.topic_config) and not is_dataclass(self.context.config):
-            self.context.logger.warning("'topic-check' section not found in context configuration")
-
-    def _get_config_option(self, option_name: str, default: Any = None) -> Any:
-        if not self.context.config:
-            return default
-
-        # overloaded context.config with either BrokerConfig or plugin's Config
-        if is_dataclass(self.context.config) and not isinstance(self.context.config, BrokerConfig):
-            # overloaded context.config for BasePlugin `Config` class, so ignoring static type check
-            return getattr(self.context.config, option_name.replace("-", "_"), default)
-        if self.topic_config and option_name in self.topic_config:
-            return self.topic_config[option_name]
-        return default
-
     async def topic_filtering(
         self, *, session: Session | None = None, topic: str | None = None, action: Action | None = None
     ) -> bool | None:
@@ -101,30 +60,14 @@ class BaseTopicPlugin(BasePlugin[BaseContext]):
             bool: `True` if topic is allowed, `False` otherwise. `None` if it can't be determined
 
         """
-        return bool(self.topic_config) or is_dataclass(self.context.config)
+        return None
 
 
 class BaseAuthPlugin(BasePlugin[BaseContext]):
     """Base class for authentication plugins."""
 
-    def _get_config_option(self, option_name: str, default: Any = None) -> Any:
-        if not self.context.config:
-            return default
-
-        if is_dataclass(self.context.config) and not isinstance(self.context.config, BrokerConfig):
-            # overloaded context.config for BasePlugin `Config` class, so ignoring static type check
-            return getattr(self.context.config, option_name.replace("-", "_"), default)
-        if self.auth_config and option_name in self.auth_config:
-            return self.auth_config[option_name]
-        return default
-
     def __init__(self, context: BaseContext) -> None:
         super().__init__(context)
-
-        self.auth_config: dict[str, Any] | None = self._get_config_section("auth")
-        if not bool(self.auth_config) and not is_dataclass(self.context.config):
-            # auth config section not found and Config dataclass not provided
-            self.context.logger.warning("'auth' section not found in context configuration")
 
     async def authenticate(self, *, session: Session) -> bool | None:
         """Logic for session authentication.
@@ -137,4 +80,4 @@ class BaseAuthPlugin(BasePlugin[BaseContext]):
             - `None` if authentication can't be achieved (then plugin result is then ignored)
 
         """
-        return bool(self.auth_config) or is_dataclass(self.context.config)
+        return None

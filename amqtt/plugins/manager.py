@@ -91,9 +91,8 @@ class PluginManager(Generic[C]):
         return self.context
 
     def _load_plugins(self, namespace: str | None = None) -> None:
-        """Load plugins from entrypoint or config dictionary.
+        """Load plugins from config dictionary.
 
-        config style is now recommended; entrypoint has been deprecated
         Example:
             config = {
                 'listeners':...,
@@ -103,13 +102,6 @@ class PluginManager(Generic[C]):
         """
         if self.app_context.config and self.app_context.config.get("plugins", None) is not None:
             # plugins loaded directly from config dictionary
-
-            if "auth" in self.app_context.config and self.app_context.config["auth"] is not None:
-                warnings.warn("Loading plugins from config will ignore 'auth' section of config.",
-                              DeprecationWarning, stacklevel=1)
-            if "topic-check" in self.app_context.config and self.app_context.config["topic-check"] is not None:
-                warnings.warn("Loading plugins from config will ignore 'topic-check' section of config.",
-                              DeprecationWarning, stacklevel=1)
 
             plugins_config: list[Any] | dict[str, Any] = self.app_context.config.get("plugins", [])
 
@@ -131,19 +123,6 @@ class PluginManager(Generic[C]):
                 self._load_str_plugins(plugins_info)
             elif isinstance(plugins_config, dict):
                 self._load_str_plugins(plugins_config)
-        else:
-            if not namespace:
-                msg = "Namespace needs to be provided for EntryPoint plugin definitions"
-                raise PluginLoadError(msg)
-
-            warnings.warn(
-                "Loading plugins from EntryPoints is deprecated and will be removed in a future version."
-                " Use `plugins` section of config instead.",
-                DeprecationWarning,
-                stacklevel=4
-            )
-
-            self._load_ep_plugins(namespace)
 
         # for all the loaded plugins, find all event callbacks
         for plugin in self._plugins:
@@ -154,57 +133,6 @@ class PluginManager(Generic[C]):
                         raise PluginImportError(msg)
                     self.logger.debug(f"'{event}' handler found for '{plugin.__class__.__name__}'")
                     self._event_plugin_callbacks[event].append(awaitable)
-
-    def _load_ep_plugins(self, namespace: str) -> None:
-        """Load plugins from `pyproject.toml` entrypoints. Deprecated."""
-        self.logger.debug(f"Loading plugins for namespace {namespace}")
-        auth_filter_list = []
-        topic_filter_list = []
-        if self.app_context.config and "auth" in self.app_context.config:
-            auth_filter_list = self.app_context.config["auth"].get("plugins", None)
-        if self.app_context.config and "topic-check" in self.app_context.config:
-            topic_filter_list = self.app_context.config["topic-check"].get("plugins", None)
-
-        ep: EntryPoints | list[EntryPoint] = []
-        if hasattr(entry_points(), "select"):
-            ep = entry_points().select(group=namespace)
-        elif namespace in entry_points():
-            ep = [entry_points()[namespace]]
-
-        for item in ep:
-            ep_plugin = self._load_ep_plugin(item)
-            if ep_plugin is not None:
-                self._plugins.append(ep_plugin.object)
-                # maintain legacy behavior that if there is no list, use all auth plugins
-                if ((auth_filter_list is None or ep_plugin.name in auth_filter_list)
-                        and hasattr(ep_plugin.object, "authenticate")):
-                    self._auth_plugins.append(ep_plugin.object)
-                # maintain legacy behavior that if there is no list, use all topic plugins
-                if ((topic_filter_list is None or ep_plugin.name in topic_filter_list)
-                        and hasattr(ep_plugin.object, "topic_filtering")):
-                    self._topic_plugins.append(ep_plugin.object)
-                self.logger.debug(f" Plugin {item.name} ready")
-
-    def _load_ep_plugin(self, ep: EntryPoint) -> Plugin | None:
-        """Load plugins from `pyproject.toml` entrypoints. Deprecated."""
-        try:
-            self.logger.debug(f" Loading plugin {ep!s}")
-            plugin = ep.load()
-
-        except ImportError as e:
-            self.logger.debug(f"Plugin import failed: {ep!r}", exc_info=True)
-            raise PluginImportError(ep) from e
-
-        self.logger.debug(f" Initializing plugin {ep!s}")
-
-        plugin_context = copy.copy(self.app_context)
-        plugin_context.logger = self.logger.getChild(ep.name)
-        try:
-            obj = plugin(plugin_context)
-            return Plugin(ep.name, ep, obj)
-        except Exception as e:
-            self.logger.debug(f"Plugin init failed: {ep!r}", exc_info=True)
-            raise PluginInitError(ep) from e
 
     def _load_str_plugins(self, plugins_info: dict[str, Any]) -> None:
 

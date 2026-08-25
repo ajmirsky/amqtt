@@ -81,16 +81,7 @@ class SessionDBPlugin(BasePlugin[BrokerContext]):
             msg = "`Config` requires file _or_ connection, but not both."
             raise PluginInitError(msg)
 
-        # backwards compatibility support for `file` option
-        if configured_file:
-            connection = f"sqlite+aiosqlite:///{configured_file}"
-            warnings.warn(
-                "persistence plugin: `file` option is now deprecated, use full `connection` string instead. "
-                " Support for `file` will be removed in future versions.",
-                DeprecationWarning,
-                stacklevel=0
-            )
-        elif not connection:
+        if not connection:
             self.config.file = Path("amqtt.db")
             connection = f"sqlite+aiosqlite:///{self.config.file}"
 
@@ -265,12 +256,6 @@ class SessionDBPlugin(BasePlugin[BrokerContext]):
             if not self.config.clear_on_shutdown:
                 return
 
-            if self.config.file:
-                await self._engine.dispose()
-                if self.config.file.exists():
-                    self.config.file.unlink()
-                return
-
             async with self._engine.begin() as conn:
                 for table in reversed(Base.metadata.sorted_tables):
                     await conn.execute(table.delete())
@@ -285,23 +270,12 @@ class SessionDBPlugin(BasePlugin[BrokerContext]):
     class Config:
         """Configuration variables."""
 
-        connection: str | None = None
+        connection: str = f"sqlite+aiosqlite:///amqtt.db"
         """SQLAlchemy connection string for the asyncio version of the database connector:
 
         - `mysql+aiomysql://user:password@host:port/dbname`
         - `postgresql+asyncpg://user:password@host:port/dbname`
         - `sqlite+aiosqlite:///amqtt.db`  # default
         """
-        file: str | Path | None = None
-        """path & filename to store the sqlite session db
-        Deprecated: use `connection` instead.
-        Existing configurations will continue to work.
-        """
-
         clear_on_shutdown: bool = True
         """if the broker shutdowns down normally, clear retained persistence data."""
-
-        def __post_init__(self) -> None:
-            """Create `Path` from string path."""
-            if isinstance(self.file, str):
-                self.file = Path(self.file)

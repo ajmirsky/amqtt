@@ -13,7 +13,6 @@ from amqtt.errors import ConnectError
 from amqtt.plugins import authentication as authentication_module
 from amqtt.plugins.authentication import (
     AnonymousAuthPlugin,
-    DeprecatedSHA512CryptHasher,
     FileAuthPlugin,
     PasswordFileError,
     _ensure_str,
@@ -129,89 +128,6 @@ def test_ensure_str_decodes_bytes_and_preserves_strings() -> None:
     assert _ensure_str("value") == "value"
 
 
-def test_deprecated_sha512_hasher_identify_handles_valid_invalid_and_bad_bytes() -> None:
-    assert DeprecatedSHA512CryptHasher.identify("$6$salt$hash") is True
-    assert DeprecatedSHA512CryptHasher.identify(b"$6$salt$hash") is True
-    assert DeprecatedSHA512CryptHasher.identify("$argon2id$hash") is False
-    assert DeprecatedSHA512CryptHasher.identify(b"\xff") is False
-
-
-def test_deprecated_sha512_hasher_metadata_and_hashing_disabled() -> None:
-    hasher = DeprecatedSHA512CryptHasher()
-
-    assert hasher.name == "sha512_crypt"
-    assert hasher.check_needs_rehash("$6$salt$hash") is True
-    with pytest.raises(NotImplementedError, match="Generating new sha512_crypt hashes is disabled"):
-        hasher.hash("password")
-
-
-def test_deprecated_sha512_verify_denies_when_native_crypt_is_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
-    hasher = DeprecatedSHA512CryptHasher()
-    monkeypatch.setattr(authentication_module, "_native_crypt", None)
-
-    with pytest.warns(RuntimeWarning, match="native 'crypt' module"):
-        assert hasher.verify("password", "$6$salt$hash") is False
-
-
-def test_deprecated_sha512_verify_rejects_non_sha512_hash(monkeypatch: pytest.MonkeyPatch) -> None:
-    hasher = DeprecatedSHA512CryptHasher()
-
-    def fail_if_called(password: str, password_hash: str) -> str:
-        raise AssertionError(f"crypt should not be called for {password}:{password_hash}")
-
-    monkeypatch.setattr(authentication_module, "_native_crypt", fail_if_called)
-
-    assert hasher.verify("password", "$argon2id$hash") is False
-
-
-def test_deprecated_sha512_verify_compares_native_hash(monkeypatch: pytest.MonkeyPatch) -> None:
-    hasher = DeprecatedSHA512CryptHasher()
-
-    def fake_crypt(password: str, password_hash: str) -> str:
-        assert password == "test"
-        return password_hash
-
-    monkeypatch.setattr(authentication_module, "_native_crypt", fake_crypt)
-
-    with pytest.warns(DeprecationWarning, match="legacy 'sha512_crypt'"):
-        assert hasher.verify(b"test", b"$6$salt$hash") is True
-
-
-def test_deprecated_sha512_verify_handles_native_crypt_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
-    hasher = DeprecatedSHA512CryptHasher()
-    monkeypatch.setattr(authentication_module, "_native_crypt", lambda password, password_hash: "$6$salt$different")
-
-    with pytest.warns(DeprecationWarning, match="legacy 'sha512_crypt'"):
-        assert hasher.verify("test", "$6$salt$hash") is False
-
-
-def test_deprecated_sha512_verify_handles_native_crypt_empty_result(monkeypatch: pytest.MonkeyPatch) -> None:
-    hasher = DeprecatedSHA512CryptHasher()
-    monkeypatch.setattr(authentication_module, "_native_crypt", lambda password, password_hash: None)
-
-    with pytest.warns(DeprecationWarning, match="legacy 'sha512_crypt'"):
-        assert hasher.verify("test", "$6$salt$hash") is False
-
-
-def test_deprecated_sha512_verify_handles_decode_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    hasher = DeprecatedSHA512CryptHasher()
-    monkeypatch.setattr(authentication_module, "_native_crypt", lambda password, password_hash: password_hash)
-
-    assert hasher.verify("test", b"\xff") is False
-
-
-def test_deprecated_sha512_verify_handles_native_crypt_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    hasher = DeprecatedSHA512CryptHasher()
-
-    def fake_crypt(password: str, password_hash: str) -> str:
-        raise ValueError("bad crypt config")
-
-    monkeypatch.setattr(authentication_module, "_native_crypt", fake_crypt)
-
-    with pytest.warns(DeprecationWarning, match="legacy 'sha512_crypt'"):
-        assert hasher.verify("test", "$6$salt$hash") is False
-
-
 def test_file_auth_no_password_file_config_logs_warning(caplog: pytest.LogCaptureFixture) -> None:
     with caplog.at_level(logging.WARNING, logger=__name__):
         auth_plugin = FileAuthPlugin(_context({"auth": {}}))
@@ -260,19 +176,6 @@ def test_file_auth_wraps_missing_password_file_errors(tmp_path: Path) -> None:
 
     with pytest.raises(PasswordFileError, match="not found"):
         FileAuthPlugin(_context({"auth": {"password-file": missing_file}}))
-
-
-def test_file_auth_wraps_unknown_hash_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    password_file = tmp_path / "passwd"
-    password_file.write_text("user:unsupported\n", encoding="utf-8")
-
-    def raise_unknown_hash(cls: type[DeprecatedSHA512CryptHasher], password_hash: str | bytes) -> bool:
-        raise UnknownHashError(password_hash)
-
-    monkeypatch.setattr(DeprecatedSHA512CryptHasher, "identify", classmethod(raise_unknown_hash))
-
-    with pytest.raises(PasswordFileError, match="Unsupported hash format"):
-        FileAuthPlugin(_context({"auth": {"password-file": password_file}}))
 
 
 def test_file_auth_wraps_malformed_password_file_errors() -> None:
